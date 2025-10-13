@@ -230,6 +230,13 @@ docs/
 # Предупреждения от PyInstaller
 build/ExpertExcelMatcher/warn-*.txt
 
+# Архивы (RAR, ZIP и др.) - обычно слишком большие для Git
+*.rar
+*.zip
+*.7z
+*.tar.gz
+*.tgz
+
 # Временные файлы отчетов (если создаете тестовые)
 *_отчет*.xlsx
 *_сопоставления*.xlsx
