@@ -143,7 +143,7 @@ class ExpertMatcher:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("🔬 Expert Excel Matcher (Исправлена статистика)")
+        self.root.title("🔬 Expert Excel Matcher v1.0")
         self.root.geometry("1200x800")
         
         self.askupo_file = None
@@ -265,7 +265,7 @@ class ExpertMatcher:
         
         tk.Label(
             title_frame,
-            text="🔬 Expert Excel Matcher (Статистика исправлена!)",
+            text="🔬 Expert Excel Matcher v1.0",
             font=("Arial", 18, "bold"),
             fg="white",
             bg="#7C3AED"
@@ -447,6 +447,162 @@ class ExpertMatcher:
         tk.Label(section4, text=help_text_libs, font=("Consolas", 9),
                 justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
 
+        # Раздел 5: Подробное описание методов
+        section5 = tk.LabelFrame(scrollable_frame, text="🔍 Подробное описание всех методов сопоставления",
+                                font=("Arial", 11, "bold"), padx=15, pady=10, bg="white")
+        section5.pack(fill=tk.X, pady=(0, 15))
+
+        help_text_methods = """
+═══════════════════════════════════════════════════════════════════
+📚 БИБЛИОТЕКА RAPIDFUZZ (10 методов)
+═══════════════════════════════════════════════════════════════════
+
+1️⃣ WRatio (рекомендуется) 🥇
+   ОПИСАНИЕ: Взвешенный алгоритм, автоматически выбирает лучшую стратегию
+   КАК РАБОТАЕТ: Комбинирует несколько методов и выбирает лучший результат
+   ПРИМЕР:
+      "Microsoft Office 365" vs "MS Office 365" → 95%
+      "Adobe Reader DC" vs "Acrobat Reader" → 85%
+   КОГДА ИСПОЛЬЗОВАТЬ: Универсальный метод, подходит для большинства случаев
+
+2️⃣ Token Set
+   ОПИСАНИЕ: Сравнивает уникальные слова, игнорируя порядок и дубликаты
+   КАК РАБОТАЕТ: Разбивает на слова, убирает повторы, сравнивает множества
+   ПРИМЕР:
+      "SQL Server Management Studio" vs "Management Studio SQL Server" → 100%
+      "Microsoft SQL Server" vs "SQL Server Microsoft" → 100%
+   КОГДА ИСПОЛЬЗОВАТЬ: Когда порядок слов не важен
+
+3️⃣ Token Sort
+   ОПИСАНИЕ: Сортирует слова по алфавиту перед сравнением
+   КАК РАБОТАЕТ: Разбивает на слова, сортирует, затем сравнивает
+   ПРИМЕР:
+      "Visual Studio Code" vs "Code Studio Visual" → 100%
+      "Google Chrome Browser" vs "Browser Chrome Google" → 100%
+   КОГДА ИСПОЛЬЗОВАТЬ: Когда названия содержат одни слова в разном порядке
+
+4️⃣ Partial Ratio
+   ОПИСАНИЕ: Ищет лучшее совпадение подстрок
+   КАК РАБОТАЕТ: Проверяет, содержится ли короткая строка в длинной
+   ПРИМЕР:
+      "Office" vs "Microsoft Office 365 ProPlus" → 90%
+      "Chrome" vs "Google Chrome Browser" → 85%
+   КОГДА ИСПОЛЬЗОВАТЬ: Когда одно название короткое, другое полное
+
+5️⃣ Ratio
+   ОПИСАНИЕ: Простое посимвольное сравнение Левенштейна
+   КАК РАБОТАЕТ: Считает минимальное число правок для совпадения
+   ПРИМЕР:
+      "Firefox" vs "Firefoх" (русская 'х') → 95%
+      "Chrome" vs "Chromium" → 85%
+   КОГДА ИСПОЛЬЗОВАТЬ: Для точного посимвольного сравнения
+
+6️⃣ QRatio
+   ОПИСАНИЕ: Быстрая версия Ratio с оптимизациями
+   КАК РАБОТАЕТ: Упрощенный алгоритм для ускорения
+   ПРИМЕР: Аналогично Ratio, но работает быстрее
+   КОГДА ИСПОЛЬЗОВАТЬ: Когда нужна скорость, а не максимальная точность
+
+7️⃣ Token Ratio
+   ОПИСАНИЕ: Комбинация Ratio и Token Sort
+   КАК РАБОТАЕТ: Сортирует токены, затем применяет Ratio
+   ПРИМЕР:
+      "Adobe Acrobat Reader" vs "Reader Acrobat Adobe" → 100%
+   КОГДА ИСПОЛЬЗОВАТЬ: Средний вариант между Token Sort и Ratio
+
+8️⃣ Partial Token Ratio
+   ОПИСАНИЕ: Комбинация Partial Ratio и Token Ratio
+   КАК РАБОТАЕТ: Частичное совпадение с сортировкой токенов
+   ПРИМЕР:
+      "MS Office" vs "Microsoft Office Professional Plus 2021" → 85%
+   КОГДА ИСПОЛЬЗОВАТЬ: Короткое название vs полное с сортировкой
+
+9️⃣ Partial Token Set
+   ОПИСАНИЕ: Комбинация Partial Ratio и Token Set
+   КАК РАБОТАЕТ: Частичное совпадение уникальных токенов
+   ПРИМЕР:
+      "SQL Server" vs "Microsoft SQL Server Enterprise Edition" → 90%
+   КОГДА ИСПОЛЬЗОВАТЬ: Подмножество слов в большом названии
+
+🔟 Partial Token Sort
+   ОПИСАНИЕ: Комбинация Partial Ratio и Token Sort
+   КАК РАБОТАЕТ: Частичное совпадение с сортированными токенами
+   ПРИМЕР:
+      "Chrome Browser" vs "Google Chrome Web Browser Latest" → 85%
+   КОГДА ИСПОЛЬЗОВАТЬ: Частичное совпадение с игнорированием порядка
+
+═══════════════════════════════════════════════════════════════════
+📊 БИБЛИОТЕКА TEXTDISTANCE (5 методов)
+═══════════════════════════════════════════════════════════════════
+
+1️⃣1️⃣ Jaro-Winkler
+   ОПИСАНИЕ: Фонетическое сравнение с акцентом на начало строки
+   КАК РАБОТАЕТ: Больший вес символам в начале названия
+   ПРИМЕР:
+      "Microsoft" vs "Mikrosoft" → 95%
+      "PostgreSQL" vs "Postgres" → 90%
+   КОГДА ИСПОЛЬЗОВАТЬ: Когда начало названия важнее конца
+
+1️⃣2️⃣ Jaro
+   ОПИСАНИЕ: Базовая версия Jaro без акцента на начало
+   КАК РАБОТАЕТ: Равномерное сравнение по всей строке
+   ПРИМЕР:
+      "Oracle" vs "Orakle" → 92%
+   КОГДА ИСПОЛЬЗОВАТЬ: Для фонетического сравнения без приоритета
+
+1️⃣3️⃣ Jaccard
+   ОПИСАНИЕ: Сравнение множеств символов/биграмм
+   КАК РАБОТАЕТ: Считает пересечение и объединение множеств
+   ПРИМЕР:
+      "MySQL" vs "MariaDB" → 40% (мало общих символов)
+      "Python" vs "Pythan" → 85%
+   КОГДА ИСПОЛЬЗОВАТЬ: Для оценки общих элементов
+
+1️⃣4️⃣ Sorensen-Dice
+   ОПИСАНИЕ: Похож на Jaccard, но с другой формулой
+   КАК РАБОТАЕТ: Удвоенное пересечение / сумма размеров
+   ПРИМЕР:
+      "Redis" vs "Reddis" → 80%
+   КОГДА ИСПОЛЬЗОВАТЬ: Альтернатива Jaccard, чуть мягче
+
+1️⃣5️⃣ Cosine
+   ОПИСАНИЕ: Косинусное расстояние векторов символов
+   КАК РАБОТАЕТ: Преобразует строки в векторы, считает угол
+   ПРИМЕР:
+      "MongoDB" vs "Mongo DB" → 95%
+   КОГДА ИСПОЛЬЗОВАТЬ: Для математически точного сравнения
+
+═══════════════════════════════════════════════════════════════════
+🔊 БИБЛИОТЕКА JELLYFISH (2 метода)
+═══════════════════════════════════════════════════════════════════
+
+1️⃣6️⃣ Jaro-Winkler (Jellyfish)
+   ОПИСАНИЕ: Аналог TextDistance Jaro-Winkler
+   КАК РАБОТАЕТ: Та же логика, другая реализация
+   ПРИМЕР: Аналогичные результаты TextDistance версии
+   КОГДА ИСПОЛЬЗОВАТЬ: Альтернативная реализация
+
+1️⃣7️⃣ Jaro (Jellyfish)
+   ОПИСАНИЕ: Аналог TextDistance Jaro
+   КАК РАБОТАЕТ: Та же логика, другая реализация
+   ПРИМЕР: Аналогичные результаты TextDistance версии
+   КОГДА ИСПОЛЬЗОВАТЬ: Альтернативная реализация
+
+═══════════════════════════════════════════════════════════════════
+💡 СОВЕТЫ ПО ВЫБОРУ МЕТОДА
+═══════════════════════════════════════════════════════════════════
+
+🎯 Общий случай → WRatio (автоматический выбор стратегии)
+📝 Разный порядок слов → Token Set / Token Sort
+✂️ Короткое vs полное → Partial Ratio / Partial Token Set
+🔤 Опечатки → Jaro-Winkler / Ratio
+⚡ Нужна скорость → QRatio
+🎲 Не уверены → Запустите режим "Сравнение методов"!
+"""
+
+        tk.Label(section5, text=help_text_methods, font=("Consolas", 8),
+                justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
+
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
@@ -483,21 +639,21 @@ class ExpertMatcher:
         
         askupo_frame = tk.Frame(files_frame)
         askupo_frame.pack(fill=tk.X, pady=5)
-        tk.Label(askupo_frame, text="1️⃣ АСКУПО (Уникальные_ПО_продукты.xlsx):", 
+        tk.Label(askupo_frame, text="1️⃣ Источник данных 1 (целевой):",
                 font=("Arial", 10, "bold")).pack(anchor=tk.W)
         self.askupo_label = tk.Label(askupo_frame, text="📂 Файл не выбран", fg="gray", font=("Arial", 9))
         self.askupo_label.pack(anchor=tk.W, padx=20)
-        tk.Button(askupo_frame, text="📁 Выбрать файл АСКУПО", command=self.select_askupo,
-                 bg="#10B981", fg="white", font=("Arial", 9, "bold"), 
+        tk.Button(askupo_frame, text="📁 Выбрать Источник данных 1 (целевой)", command=self.select_askupo,
+                 bg="#10B981", fg="white", font=("Arial", 9, "bold"),
                  padx=15, pady=5).pack(anchor=tk.W, padx=20, pady=3)
-        
+
         eatool_frame = tk.Frame(files_frame)
         eatool_frame.pack(fill=tk.X, pady=5)
-        tk.Label(eatool_frame, text="2️⃣ EA Tool (EA Tool short name v1.xlsx):", 
+        tk.Label(eatool_frame, text="2️⃣ Источник данных 2:",
                 font=("Arial", 10, "bold")).pack(anchor=tk.W)
         self.eatool_label = tk.Label(eatool_frame, text="📂 Файл не выбран", fg="gray", font=("Arial", 9))
         self.eatool_label.pack(anchor=tk.W, padx=20)
-        tk.Button(eatool_frame, text="📁 Выбрать файл EA Tool", command=self.select_eatool,
+        tk.Button(eatool_frame, text="📁 Выбрать Источник данных 2", command=self.select_eatool,
                  bg="#10B981", fg="white", font=("Arial", 9, "bold"),
                  padx=15, pady=5).pack(anchor=tk.W, padx=20, pady=3)
         
@@ -654,8 +810,8 @@ class ExpertMatcher:
         
         headers = [
             ("num", "№", 50),
-            ("askupo", "АСКУПО", 350),
-            ("eatool", "EA Tool", 350),
+            ("askupo", "Источник данных 1 (целевой)", 350),
+            ("eatool", "Источник данных 2", 350),
             ("percent", "Совпадение %", 120),
         ]
         
@@ -697,7 +853,7 @@ class ExpertMatcher:
 
     def select_askupo(self):
         filename = filedialog.askopenfilename(
-            title="Выберите файл АСКУПО",
+            title="Выберите Источник данных 1 (целевой)",
             filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
         )
         if filename:
@@ -705,7 +861,7 @@ class ExpertMatcher:
             is_valid, message = self.validate_excel_file(filename)
 
             if not is_valid:
-                messagebox.showerror("❌ Ошибка валидации файла АСКУПО",
+                messagebox.showerror("❌ Ошибка валидации Источника данных 1",
                                    f"Файл не прошёл проверку:\n\n{message}\n\n"
                                    f"Требования:\n"
                                    f"• Первый столбец должен содержать названия ПО (текст)\n"
@@ -722,7 +878,7 @@ class ExpertMatcher:
     
     def select_eatool(self):
         filename = filedialog.askopenfilename(
-            title="Выберите файл EA Tool",
+            title="Выберите Источник данных 2",
             filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
         )
         if filename:
@@ -730,7 +886,7 @@ class ExpertMatcher:
             is_valid, message = self.validate_excel_file(filename)
 
             if not is_valid:
-                messagebox.showerror("❌ Ошибка валидации файла EA Tool",
+                messagebox.showerror("❌ Ошибка валидации Источника данных 2",
                                    f"Файл не прошёл проверку:\n\n{message}\n\n"
                                    f"Требования:\n"
                                    f"• Первый столбец должен содержать названия ПО (текст)\n"
@@ -1097,37 +1253,56 @@ class ExpertMatcher:
         
         return score
     
-    def test_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame, 
+    def test_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame,
                              eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str) -> pd.DataFrame:
         """Оптимизированное тестирование метода"""
-        
+
         eatool_names = eatool_df[eatool_col].tolist()
         eatool_normalized = [self.normalize_string(name) for name in eatool_names]
         choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_names)}
-        
+
+        # Создаём словарь для быстрого поиска строки по оригинальному имени
+        eatool_row_dict = {str(row[eatool_col]): row for _, row in eatool_df.iterrows()}
+
         results = []
-        
+
         for _, row in askupo_df.iterrows():
             askupo_name = str(row[askupo_col])
             askupo_normalized = self.normalize_string(askupo_name)
-            
+
             best_match, best_score = method.find_best_match(
-                askupo_normalized, 
+                askupo_normalized,
                 eatool_normalized,
                 choice_dict
             )
-            
+
             if best_score < 50:
                 best_match = ""
                 best_score = 0
-            
-            results.append({
-                'АСКУПО': askupo_name,
-                'EA Tool': best_match,
+
+            # Базовые поля
+            result_row = {
+                'Источник данных 1 (целевой)': askupo_name,
+                'Источник данных 2': best_match,
                 'Процент': round(best_score, 1),
                 'Метод': method.name
-            })
-        
+            }
+
+            # Добавляем ВСЕ остальные столбцы из Источника 2 (если есть совпадение)
+            if best_match:
+                matched_row = eatool_row_dict.get(best_match)
+                if matched_row is not None:
+                    for col in eatool_df.columns:
+                        if col != eatool_col:  # Пропускаем первый столбец (он уже есть)
+                            result_row[col] = matched_row[col]
+            else:
+                # Если нет совпадения, добавляем пустые значения для всех столбцов
+                for col in eatool_df.columns:
+                    if col != eatool_col:
+                        result_row[col] = ""
+
+            results.append(result_row)
+
         return pd.DataFrame(results)
     
     def apply_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame, 
@@ -1163,33 +1338,52 @@ class ExpertMatcher:
         eatool_names = eatool_df[eatool_col].tolist()
         eatool_normalized = [self.normalize_string(name) for name in eatool_names]
         choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_names)}
-        
+
+        # Создаём словарь для быстрого поиска строки по оригинальному имени
+        eatool_row_dict = {str(row[eatool_col]): row for _, row in eatool_df.iterrows()}
+
         status_label.config(text="Обработка записей...")
-        
+
         results = []
         total = len(askupo_df)
         progress_bar['maximum'] = total
-        
+
         for idx, row in askupo_df.iterrows():
             askupo_name = str(row[askupo_col])
             askupo_normalized = self.normalize_string(askupo_name)
-            
+
             best_match, best_score = method.find_best_match(
                 askupo_normalized,
                 eatool_normalized,
                 choice_dict
             )
-            
+
             if best_score < 50:
                 best_match = ""
                 best_score = 0
-            
-            results.append({
-                'АСКУПО': askupo_name,
-                'EA Tool': best_match,
+
+            # Базовые поля
+            result_row = {
+                'Источник данных 1 (целевой)': askupo_name,
+                'Источник данных 2': best_match,
                 'Процент': round(best_score, 1),
                 'Метод': method.name
-            })
+            }
+
+            # Добавляем ВСЕ остальные столбцы из Источника 2 (если есть совпадение)
+            if best_match:
+                matched_row = eatool_row_dict.get(best_match)
+                if matched_row is not None:
+                    for col in eatool_df.columns:
+                        if col != eatool_col:  # Пропускаем первый столбец (он уже есть)
+                            result_row[col] = matched_row[col]
+            else:
+                # Если нет совпадения, добавляем пустые значения для всех столбцов
+                for col in eatool_df.columns:
+                    if col != eatool_col:
+                        result_row[col] = ""
+
+            results.append(result_row)
             
             if idx % 10 == 0:
                 elapsed = time.time() - start_time
@@ -1296,16 +1490,19 @@ class ExpertMatcher:
             self.results_tree.delete(item)
         
         for idx, row in self.results.head(50).iterrows():
+            source1 = str(row['Источник данных 1 (целевой)'])
+            source2 = str(row['Источник данных 2']) if row['Источник данных 2'] else ""
+
             values = (
                 idx + 1,
-                row['АСКУПО'][:50] + "..." if len(row['АСКУПО']) > 50 else row['АСКУПО'],
-                row['EA Tool'][:50] + "..." if row['EA Tool'] and len(row['EA Tool']) > 50 else row['EA Tool'] if row['EA Tool'] else "❌ НЕТ",
+                source1[:50] + "..." if len(source1) > 50 else source1,
+                source2[:50] + "..." if source2 and len(source2) > 50 else source2 if source2 else "❌ НЕТ",
                 f"{row['Процент']}%"
             )
-            
+
             percent = row['Процент']
             tag = 'perfect' if percent == 100 else 'high' if percent >= 90 else 'medium' if percent >= 70 else 'low' if percent >= 50 else 'very_low' if percent > 0 else 'none'
-            
+
             self.results_tree.insert("", tk.END, values=values, tags=(tag,))
         
         self.results_tree.tag_configure('perfect', background='#D1FAE5')
@@ -1408,9 +1605,14 @@ class ExpertMatcher:
         
         try:
             data_to_export = data.copy()
+
+            # Заменяем NaN и inf на пустые строки для корректного экспорта
+            data_to_export = data_to_export.replace([np.nan, np.inf, -np.inf], "")
+
             data_to_export.insert(0, '№', range(1, len(data_to_export) + 1))
-            
-            with pd.ExcelWriter(save_path, engine='xlsxwriter') as writer:
+
+            with pd.ExcelWriter(save_path, engine='xlsxwriter',
+                              engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:
                 data_to_export.to_excel(writer, sheet_name='Результаты', index=False)
                 
                 workbook = writer.book
@@ -1427,11 +1629,20 @@ class ExpertMatcher:
                 
                 for col_num, value in enumerate(data_to_export.columns.values):
                     worksheet.write(0, col_num, value, header_format)
-                
-                worksheet.set_column('A:A', 8)
-                worksheet.set_column('B:C', 55)
-                worksheet.set_column('D:D', 15)
-                worksheet.set_column('E:E', 40)
+
+                # Динамическая ширина столбцов
+                worksheet.set_column('A:A', 8)  # Номер строки
+                # Столбцы B и далее - автоматическая ширина в зависимости от количества
+                for col_num in range(1, len(data_to_export.columns)):
+                    col_name = data_to_export.columns[col_num]
+                    if 'Источник данных' in str(col_name):
+                        worksheet.set_column(col_num, col_num, 45)  # Широкие столбцы для названий
+                    elif col_name == 'Процент':
+                        worksheet.set_column(col_num, col_num, 12)  # Узкий для процента
+                    elif col_name == 'Метод':
+                        worksheet.set_column(col_num, col_num, 35)  # Средний для метода
+                    else:
+                        worksheet.set_column(col_num, col_num, 20)  # Остальные столбцы из Источника 2
                 
                 formats = {
                     100: workbook.add_format({'bg_color': '#D1FAE5', 'border': 1}),
@@ -1502,7 +1713,15 @@ class ExpertMatcher:
             methods_data = self.full_comparison_results['methods_data']
             comparison_stats = self.full_comparison_results['comparison_stats']
 
-            with pd.ExcelWriter(save_path, engine='xlsxwriter') as writer:
+            # Очищаем все DataFrame от NaN и inf
+            cleaned_methods_data = {}
+            for method_name, df in methods_data.items():
+                cleaned_df = df.copy()
+                cleaned_df = cleaned_df.replace([np.nan, np.inf, -np.inf], "")
+                cleaned_methods_data[method_name] = cleaned_df
+
+            with pd.ExcelWriter(save_path, engine='xlsxwriter',
+                              engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:
                 workbook = writer.book
 
                 # Форматы
@@ -1554,7 +1773,7 @@ class ExpertMatcher:
                 worksheet.set_column('C:L', 15)
 
                 # 2. Листы для каждого метода
-                for method_name, results_df in methods_data.items():
+                for method_name, results_df in cleaned_methods_data.items():
                     # Ограничиваем длину названия листа (Excel лимит 31 символ)
                     sheet_name = method_name[:28] + "..." if len(method_name) > 31 else method_name
 
@@ -1574,11 +1793,18 @@ class ExpertMatcher:
                     for col_num, value in enumerate(export_df.columns.values):
                         worksheet.write(0, col_num, value, header_format)
 
-                    # Ширина столбцов
-                    worksheet.set_column('A:A', 8)
-                    worksheet.set_column('B:C', 45)
-                    worksheet.set_column('D:D', 15)
-                    worksheet.set_column('E:E', 35)
+                    # Динамическая ширина столбцов
+                    worksheet.set_column('A:A', 8)  # Номер строки
+                    for col_num in range(1, len(export_df.columns)):
+                        col_name = export_df.columns[col_num]
+                        if 'Источник данных' in str(col_name):
+                            worksheet.set_column(col_num, col_num, 45)  # Широкие столбцы для названий
+                        elif col_name == 'Процент':
+                            worksheet.set_column(col_num, col_num, 12)  # Узкий для процента
+                        elif col_name == 'Метод':
+                            worksheet.set_column(col_num, col_num, 35)  # Средний для метода
+                        else:
+                            worksheet.set_column(col_num, col_num, 20)  # Остальные столбцы из Источника 2
 
                     # Цветовая раскраска по проценту совпадения
                     for row_num in range(1, len(export_df) + 1):
@@ -1603,9 +1829,9 @@ class ExpertMatcher:
 
             messagebox.showinfo("Успех", f"✅ Полное сравнение сохранено!\n\n"
                               f"📁 Файл: {Path(save_path).name}\n"
-                              f"📊 Листов: {len(methods_data) + 1}\n"
+                              f"📊 Листов: {len(cleaned_methods_data) + 1}\n"
                               f"   • Сводка: 1 лист\n"
-                              f"   • Результаты методов: {len(methods_data)} листов")
+                              f"   • Результаты методов: {len(cleaned_methods_data)} листов")
 
         except Exception as e:
             messagebox.showerror("Ошибка", f"❌ Ошибка при экспорте:\n{str(e)}")
