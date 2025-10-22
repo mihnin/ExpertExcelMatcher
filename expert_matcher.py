@@ -582,8 +582,9 @@ class ExpertMatcher:
             askupo_df = self.read_data_file(self.askupo_file)
             eatool_df = self.read_data_file(self.eatool_file)
 
-            askupo_col = askupo_df.columns[0]
-            eatool_col = eatool_df.columns[0]
+            # Используем выбранные столбцы вместо жестко заданных columns[0]
+            askupo_cols = self.selected_askupo_cols
+            eatool_cols = self.selected_eatool_cols
 
             # Динамически рассчитываем примерное время
             sample_size = min(200, len(askupo_df))
@@ -637,7 +638,7 @@ class ExpertMatcher:
                 self.root.update()
 
                 score = self.evaluate_method_fast(method, sample_askupo, eatool_df,
-                                                  askupo_col, eatool_col)
+                                                  askupo_cols, eatool_cols)
 
                 if score > best_score:
                     best_score = score
@@ -654,7 +655,7 @@ class ExpertMatcher:
                               f"⏱️ Применение ко всем данным займет ~2-3 минуты")
 
             self.apply_method_optimized(best_method, askupo_df, eatool_df,
-                                       askupo_col, eatool_col)
+                                       askupo_cols, eatool_cols)
 
         except Exception as e:
             messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}\n\n"
@@ -675,8 +676,9 @@ class ExpertMatcher:
             askupo_df = self.read_data_file(self.askupo_file)
             eatool_df = self.read_data_file(self.eatool_file)
 
-            askupo_col = askupo_df.columns[0]
-            eatool_col = eatool_df.columns[0]
+            # Используем выбранные столбцы вместо жестко заданных columns[0]
+            askupo_cols = self.selected_askupo_cols
+            eatool_cols = self.selected_eatool_cols
 
             sample_size = min(200, len(askupo_df))
             sample_askupo = askupo_df.head(sample_size)
@@ -719,8 +721,9 @@ class ExpertMatcher:
                 self.root.update()
 
                 start_time = time.time()
+                # test_method_optimized использует self.selected_*_cols
                 results = self.test_method_optimized(method, sample_askupo, eatool_df,
-                                                     askupo_col, eatool_col)
+                                                     None, None)
                 elapsed = time.time() - start_time
 
                 # Используем ИСПРАВЛЕННУЮ функцию подсчета статистики
@@ -769,8 +772,9 @@ class ExpertMatcher:
         askupo_df = self.read_data_file(self.askupo_file)
         eatool_df = self.read_data_file(self.eatool_file)
 
-        askupo_col = askupo_df.columns[0]
-        eatool_col = eatool_df.columns[0]
+        # Используем выбранные столбцы вместо жестко заданных columns[0]
+        askupo_cols = self.selected_askupo_cols
+        eatool_cols = self.selected_eatool_cols
 
         # Создание окна прогресса
         progress_win = tk.Toplevel(self.root)
@@ -808,8 +812,9 @@ class ExpertMatcher:
             self.root.update()
 
             # Применяем метод ко ВСЕМ данным
+            # test_method_optimized использует self.selected_*_cols
             results_df = self.test_method_optimized(method, askupo_df, eatool_df,
-                                                   askupo_col, eatool_col)
+                                                   None, None)
 
             # Сохраняем результаты
             all_methods_results[method.name] = results_df
@@ -908,15 +913,20 @@ class ExpertMatcher:
     # Вся функциональность теперь в run_full_comparison_mode
 
     def evaluate_method_fast(self, method: MatchingMethod, sample_askupo: pd.DataFrame,
-                            eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str) -> tuple:
+                            eatool_df: pd.DataFrame, askupo_cols: list, eatool_cols: list) -> tuple:
         """Быстрая оценка качества метода
 
         Возвращает кортеж для лексикографического сравнения:
         (количество 100%, количество 90-99%, средний процент)
         Это обеспечивает единообразие с режимом сравнения методов.
+
+        Args:
+            askupo_cols: Список столбцов источника 1 для сравнения
+            eatool_cols: Список столбцов источника 2 для сравнения
         """
+        # test_method_optimized уже правильно обрабатывает списки столбцов через self.selected_*_cols
         results = self.test_method_optimized(method, sample_askupo, eatool_df,
-                                            askupo_col, eatool_col)
+                                            None, None)
 
         stats = self.engine.calculate_statistics(results)
 
@@ -994,42 +1004,55 @@ class ExpertMatcher:
 
         return pd.DataFrame(results)
     
-    def apply_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame, 
-                               eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str):
-        """Оптимизированное применение метода"""
-        
+    def apply_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame,
+                               eatool_df: pd.DataFrame, askupo_cols: list, eatool_cols: list):
+        """Оптимизированное применение метода с поддержкой множественных столбцов
+
+        Args:
+            askupo_cols: Список столбцов источника 1 для сравнения
+            eatool_cols: Список столбцов источника 2 для сравнения
+        """
+
         progress_win = tk.Toplevel(self.root)
         progress_win.title(f"Применение метода...")
         progress_win.geometry("600x250")
         progress_win.transient(self.root)
         progress_win.grab_set()
-        
-        tk.Label(progress_win, text=f"⚙️ {method.name}", 
+
+        tk.Label(progress_win, text=f"⚙️ {method.name}",
                 font=("Arial", 12, "bold")).pack(pady=10)
-        
-        status_label = tk.Label(progress_win, text="Подготовка данных...", 
+
+        status_label = tk.Label(progress_win, text="Подготовка данных...",
                                font=("Arial", 10))
         status_label.pack(pady=5)
-        
+
         progress_label = tk.Label(progress_win, text="", font=("Arial", 9))
         progress_label.pack(pady=5)
-        
+
         progress_bar = ttk.Progressbar(progress_win, length=500, mode='determinate')
         progress_bar.pack(pady=10)
-        
+
         time_label = tk.Label(progress_win, text="", font=("Arial", 9), fg="gray")
         time_label.pack(pady=5)
-        
-        self.root.update()
-        
-        start_time = time.time()
-        
-        eatool_names = eatool_df[eatool_col].tolist()
-        eatool_normalized = [self.engine.normalize_string(name) for name in eatool_names]
-        choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_names)}
 
-        # Создаём словарь для быстрого поиска строки по оригинальному имени
-        eatool_row_dict = {str(row[eatool_col]): row for _, row in eatool_df.iterrows()}
+        self.root.update()
+
+        start_time = time.time()
+
+        # Подготовка данных источника 2 с объединением столбцов
+        eatool_combined_names = []
+        for _, row in eatool_df.iterrows():
+            combined = self.engine.combine_columns(row, eatool_cols)
+            eatool_combined_names.append(combined)
+
+        eatool_normalized = [self.engine.normalize_string(name) for name in eatool_combined_names]
+        choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_combined_names)}
+
+        # Создаём словарь для быстрого поиска строки по комбинированному значению
+        eatool_row_dict = {}
+        for idx, row in eatool_df.iterrows():
+            combined = self.engine.combine_columns(row, eatool_cols)
+            eatool_row_dict[combined] = row
 
         status_label.config(text="Обработка записей...")
 
@@ -1038,8 +1061,9 @@ class ExpertMatcher:
         progress_bar['maximum'] = total
 
         for idx, row in askupo_df.iterrows():
-            askupo_name = str(row[askupo_col])
-            askupo_normalized = self.engine.normalize_string(askupo_name)
+            # Объединяем значения из выбранных столбцов источника 1
+            askupo_combined = self.engine.combine_columns(row, askupo_cols)
+            askupo_normalized = self.engine.normalize_string(askupo_combined)
 
             best_match, best_score = method.find_best_match(
                 askupo_normalized,
@@ -1054,7 +1078,7 @@ class ExpertMatcher:
 
             # Используем вспомогательный метод (рефакторинг v2.1 - устранение дублирования)
             result_row = self._create_result_row_dict(
-                askupo_combined=askupo_name,
+                askupo_combined=askupo_combined,
                 best_match=best_match,
                 best_score=best_score,
                 method_name=method.name,
