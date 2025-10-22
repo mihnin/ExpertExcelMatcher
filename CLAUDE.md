@@ -4,18 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python-based fuzzy string matching application called "Expert Excel Matcher v2.1" designed to match software product names between two Excel databases. The application uses a tkinter GUI and implements multiple fuzzy matching algorithms to find the best correspondences between product names.
+This is a Python-based fuzzy string matching application called "Expert Excel Matcher v2.1" designed to match software product names between two data sources (Excel or CSV). The application uses a tkinter GUI and implements multiple fuzzy matching algorithms to find the best correspondences between product names.
 
 **Version**: 2.1.0
-**Last Refactored**: 2025-10-22
+**Last Updated**: 2025-10-22
 
 **Key Features**:
+- **Universal file support**: Excel (.xlsx, .xls) and CSV files with automatic encoding detection
 - Tests ALL available methods (not just top 5)
 - Dynamic time estimation based on method types
 - Adaptive UI with scrolling support
 - Multiple column comparison (1-2 columns)
 - Custom column selection and inheritance
 - Built-in Exact Match (ВПР) method
+- Lexicographic ranking algorithm for method selection
 - Refactored codebase with helper methods and constants (v2.1)
 
 ## Commands
@@ -70,9 +72,18 @@ python check_report.py
      - **Compare mode**: Tests ALL methods on sample data, displays comparison metrics, uses SAME ranking logic as Auto
      - **Full Compare mode**: Applies ALL methods to ALL data and exports comprehensive Excel report (30-60 min)
      - **Manual mode**: Uses a user-selected specific method
+     - **Multi-manual mode**: Tests multiple user-selected methods and exports comparison
    - **Note**: Auto and Compare modes use IDENTICAL selection logic, ensuring Auto always picks the #1 method from Compare
 
-3. **Matching Libraries Integration**
+3. **Universal File Reading** (`read_data_file()`, NEW in v2.1)
+   - Universal method for reading both Excel and CSV files
+   - **CSV encoding detection**: Tries multiple encodings automatically (UTF-8-sig, UTF-8, CP1251, Windows-1251, Latin1)
+   - **Format detection**: Based on file extension (.csv vs .xlsx/.xls)
+   - Used by all file reading operations: validation, column loading, data processing
+   - Allows mixing formats: File 1 can be Excel, File 2 can be CSV
+   - Example: `df = self.read_data_file(filename, nrows=100)` - works for any format
+
+4. **Matching Libraries Integration**
    - **RapidFuzz** (RAPIDFUZZ_AVAILABLE): Primary library, fastest performance
      - WRatio (recommended), Token Set, Token Sort, Partial Ratio, Ratio, QRatio
    - **TextDistance** (TEXTDISTANCE_AVAILABLE): Scientific distance metrics
@@ -170,11 +181,15 @@ python check_report.py
 
 ## File Expectations
 
-- **Input File 1**: АСКУПО database (e.g., "Уникальные_ПО_продукты.xlsx")
-- **Input File 2**: EA Tool database (e.g., "EA Tool short name v1.xlsx")
-- Both files must be Excel format (.xlsx or .xls)
-- First column must contain software product names (strings)
-- Files are validated via `validate_excel_file()` (lines 669-696) on selection
+- **Input File 1**: АСКУПО database (e.g., "Уникальные_ПО_продукты.xlsx" or "data.csv")
+- **Input File 2**: EA Tool database (e.g., "EA Tool short name v1.xlsx" or "products.csv")
+- **Supported formats**: Excel (.xlsx, .xls) or CSV (.csv) - can mix formats!
+- **CSV encoding**: Automatic detection (UTF-8, UTF-8-BOM, CP1251, Windows-1251, Latin1)
+- **CSV delimiter**: Comma (standard)
+- Files can have different formats (e.g., File 1 = Excel, File 2 = CSV)
+- Selected columns must contain software product names (strings)
+- Files are validated via `validate_excel_file()` on selection
+  - Uses universal `read_data_file()` method for both Excel and CSV
   - Checks for empty files, missing columns, insufficient text data
   - Requires minimum 3 text entries in first column
 
