@@ -4,20 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python-based fuzzy string matching application called "Expert Excel Matcher v2.1" designed to match software product names between two data sources (Excel or CSV). The application uses a tkinter GUI and implements multiple fuzzy matching algorithms to find the best correspondences between product names.
+This is a Python-based fuzzy string matching application called "Expert Excel Matcher v2.2" designed to match software product names between two data sources (Excel or CSV). The application uses a tkinter GUI and implements multiple fuzzy matching algorithms to find the best correspondences between product names.
 
-**Version**: 2.1.0
+**Version**: 2.2.0
 **Last Updated**: 2025-10-22
 
 **Key Features**:
-- **Universal file support**: Excel (.xlsx, .xls) and CSV files with automatic encoding detection
+- **Universal file support**: Excel (.xlsx, .xls) and CSV files with automatic encoding detection (UTF-8-BOM, UTF-8, CP1251, Windows-1251, Latin1)
 - Tests ALL available methods (not just top 5)
 - Dynamic time estimation based on method types
-- Adaptive UI with scrolling support
+- Adaptive UI with scrolling support and intuitive description of capabilities
 - Multiple column comparison (1-2 columns)
 - Custom column selection and inheritance
 - Built-in Exact Match (ВПР) method
 - Lexicographic ranking algorithm for method selection
+- Simplified file validation (any data types accepted)
 - Refactored codebase with helper methods and constants (v2.1)
 
 ## Commands
