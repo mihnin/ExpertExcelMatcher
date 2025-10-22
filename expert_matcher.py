@@ -144,7 +144,21 @@ class ExpertMatcher:
     def __init__(self, root):
         self.root = root
         self.root.title("🔬 Expert Excel Matcher v2.0")
-        self.root.geometry("1200x900")
+
+        # Адаптивный размер окна
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # 80% от размера экрана, минимум 1000x700
+        window_width = max(1000, int(screen_width * 0.8))
+        window_height = max(700, int(screen_height * 0.8))
+
+        # Центрирование окна
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.minsize(1000, 700)  # Минимальный размер окна
 
         self.askupo_file = None
         self.eatool_file = None
@@ -160,6 +174,7 @@ class ExpertMatcher:
         self.inherit_askupo_cols_var = tk.BooleanVar(value=False)  # Наследовать столбцы из источника 1
         self.inherit_eatool_cols_var = tk.BooleanVar(value=True)   # Наследовать столбцы из источника 2
         self.multi_column_mode_var = tk.BooleanVar(value=False)    # Режим сравнения по нескольким столбцам
+        self.selected_methods = []  # Выбранные методы для режима "Выбор нескольких методов"
 
         self.methods = self.register_all_methods()
 
@@ -652,9 +667,29 @@ class ExpertMatcher:
         scrollbar.pack(side="right", fill="y")
 
     def create_setup_tab(self):
-        """Вкладка загрузки файлов"""
-        main_frame = tk.Frame(self.setup_tab, padx=20, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        """Вкладка загрузки файлов с прокруткой"""
+        # Создаем Canvas для прокрутки
+        canvas = tk.Canvas(self.setup_tab)
+        scrollbar = tk.Scrollbar(self.setup_tab, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, padx=20, pady=20)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Bind mousewheel для прокрутки
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        main_frame = scrollable_frame
         
         info_frame = tk.LabelFrame(main_frame, text="Доступные библиотеки", 
                                    font=("Arial", 11, "bold"), padx=10, pady=10)
@@ -729,21 +764,56 @@ class ExpertMatcher:
                       text="⚙️ Выбор конкретного метода (~2-3 минуты) - применяет выбранный метод",
                       variable=self.mode_var, value="manual",
                       font=("Arial", 9)).pack(anchor=tk.W, padx=20)
-        
+        tk.Radiobutton(mode_frame,
+                      text="🎯 Выбор нескольких методов (sample) - тестирует выбранные методы и показывает сравнение",
+                      variable=self.mode_var, value="multi_manual",
+                      font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+
+        # Фрейм для выбора методов
         self.method_selector_frame = tk.Frame(settings_frame)
         self.method_selector_frame.pack(fill=tk.X, pady=5)
-        
-        tk.Label(self.method_selector_frame, text="Выберите метод:", 
+
+        tk.Label(self.method_selector_frame, text="Выберите методы (для режимов ⚙️ и 🎯):",
                 font=("Arial", 9, "bold")).pack(anchor=tk.W, padx=20)
-        
-        self.selected_method = tk.StringVar()
-        method_combo = ttk.Combobox(self.method_selector_frame, 
-                                    textvariable=self.selected_method,
-                                    values=[m.name for m in self.methods],
-                                    state="readonly", width=60)
-        method_combo.pack(anchor=tk.W, padx=20, pady=3)
+
+        tk.Label(self.method_selector_frame,
+                text="💡 Удерживайте Ctrl для выбора нескольких методов",
+                font=("Arial", 8), fg="gray").pack(anchor=tk.W, padx=20)
+
+        # Listbox с прокруткой для выбора методов
+        listbox_frame = tk.Frame(self.method_selector_frame)
+        listbox_frame.pack(anchor=tk.W, padx=20, pady=5)
+
+        methods_scrollbar = tk.Scrollbar(listbox_frame)
+        methods_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.methods_listbox = tk.Listbox(listbox_frame,
+                                          selectmode=tk.MULTIPLE,
+                                          height=8,
+                                          width=80,
+                                          yscrollcommand=methods_scrollbar.set,
+                                          exportselection=False)
+        self.methods_listbox.pack(side=tk.LEFT, fill=tk.BOTH)
+        methods_scrollbar.config(command=self.methods_listbox.yview)
+
+        # Заполняем список методами
+        for method in self.methods:
+            self.methods_listbox.insert(tk.END, method.name)
+
+        # Выбираем первый метод по умолчанию
         if self.methods:
-            method_combo.current(0)
+            self.methods_listbox.selection_set(0)
+
+        # Кнопка "Выбрать все методы"
+        button_frame = tk.Frame(self.method_selector_frame)
+        button_frame.pack(anchor=tk.W, padx=20, pady=5)
+
+        tk.Button(button_frame, text="✓ Выбрать все",
+                 command=self.select_all_methods,
+                 font=("Arial", 8), padx=10, pady=3).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="✗ Снять выбор",
+                 command=self.deselect_all_methods,
+                 font=("Arial", 8), padx=10, pady=3).pack(side=tk.LEFT, padx=5)
 
         # ==== НОВАЯ СЕКЦИЯ: Выбор столбцов для сравнения ====
         columns_frame = tk.LabelFrame(main_frame, text="Выбор столбцов для сравнения",
@@ -1093,6 +1163,19 @@ class ExpertMatcher:
             self.eatool_col_listbox.selection_clear(selected_indices[-1])
             self.selected_eatool_cols = self.selected_eatool_cols[:-1]
 
+    def select_all_methods(self):
+        """Выбрать все методы в списке"""
+        self.methods_listbox.selection_set(0, tk.END)
+
+    def deselect_all_methods(self):
+        """Снять выбор всех методов"""
+        self.methods_listbox.selection_clear(0, tk.END)
+
+    def get_selected_methods(self):
+        """Получить список выбранных методов"""
+        selected_indices = self.methods_listbox.curselection()
+        return [self.methods[i] for i in selected_indices]
+
     def start_processing(self):
         """Начать обработку"""
         # Валидация выбранных столбцов
@@ -1129,7 +1212,21 @@ class ExpertMatcher:
                                   f"Источник 2: {len(self.selected_eatool_cols)} столбцов\n\n"
                                   "Для сравнения будет использован только первый столбец из каждого источника.")
 
+        # Валидация выбранных методов для режимов manual и multi_manual
         mode = self.mode_var.get()
+        if mode in ("manual", "multi_manual"):
+            selected_methods = self.get_selected_methods()
+            if not selected_methods:
+                messagebox.showerror("Ошибка",
+                                   "Не выбраны методы!\n\n"
+                                   "Выберите хотя бы один метод из списка.")
+                return
+
+            if mode == "manual" and len(selected_methods) > 1:
+                messagebox.showwarning("Предупреждение",
+                                      f"Для режима 'Выбор конкретного метода' выбрано {len(selected_methods)} методов.\n\n"
+                                      "Будет использован первый выбранный метод.\n"
+                                      "Для сравнения нескольких методов используйте режим '🎯 Выбор нескольких методов'.")
 
         if mode == "auto":
             self.run_auto_mode()
@@ -1137,6 +1234,8 @@ class ExpertMatcher:
             self.run_compare_mode()
         elif mode == "full_compare":
             self.run_full_comparison_mode()
+        elif mode == "multi_manual":
+            self.run_multi_manual_mode()
         else:
             self.run_manual_mode()
     
@@ -1451,32 +1550,117 @@ class ExpertMatcher:
             messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
 
     def run_manual_mode(self):
-        """Ручной режим"""
+        """Ручной режим - применение одного выбранного метода"""
         try:
-            method_name = self.selected_method.get()
-            method = next((m for m in self.methods if m.name == method_name), None)
-            
-            if not method:
+            selected_methods = self.get_selected_methods()
+            if not selected_methods:
                 messagebox.showerror("Ошибка", "Метод не выбран")
                 return
-            
+
+            method = selected_methods[0]  # Берем первый выбранный метод
+
             askupo_df = pd.read_excel(self.askupo_file)
             eatool_df = pd.read_excel(self.eatool_file)
-            
+
             askupo_col = askupo_df.columns[0]
             eatool_col = eatool_df.columns[0]
-            
+
             info_msg = (f"⚙️ Метод: {method.name}\n"
-                       f"📦 Записей АСКУПО: {len(askupo_df)}\n"
-                       f"📦 Записей EA Tool: {len(eatool_df)}\n"
+                       f"📦 Записей Источник 1: {len(askupo_df)}\n"
+                       f"📦 Записей Источник 2: {len(eatool_df)}\n"
                        f"⏱️ Примерное время: 2-3 минуты")
-            
+
             if not messagebox.askokcancel("Начать обработку?", info_msg):
                 return
-            
-            self.apply_method_optimized(method, askupo_df, eatool_df, 
+
+            self.apply_method_optimized(method, askupo_df, eatool_df,
                                        askupo_col, eatool_col)
-            
+
+        except Exception as e:
+            messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
+
+    def run_multi_manual_mode(self):
+        """Режим выбора нескольких методов - сравнение выбранных методов на sample"""
+        try:
+            selected_methods = self.get_selected_methods()
+            if not selected_methods:
+                messagebox.showerror("Ошибка", "Методы не выбраны")
+                return
+
+            askupo_df = pd.read_excel(self.askupo_file)
+            eatool_df = pd.read_excel(self.eatool_file)
+
+            askupo_col = askupo_df.columns[0]
+            eatool_col = eatool_df.columns[0]
+
+            sample_size = min(200, len(askupo_df))
+            sample_askupo = askupo_df.head(sample_size)
+
+            info_msg = (f"🎯 Будет протестировано {len(selected_methods)} выбранных методов:\n\n"
+                       + "\n".join([f"  • {m.name}" for m in selected_methods[:5]])
+                       + (f"\n  ... и еще {len(selected_methods)-5}" if len(selected_methods) > 5 else "")
+                       + f"\n\n📦 Sample: {sample_size} записей\n"
+                       f"⏱️ Примерное время: {len(selected_methods) * 0.5:.0f}-{len(selected_methods) * 1:.0f} минут")
+
+            if not messagebox.askokcancel("Начать сравнение?", info_msg):
+                return
+
+            progress_win = tk.Toplevel(self.root)
+            progress_win.title("Сравнение выбранных методов...")
+            progress_win.geometry("500x200")
+            progress_win.transient(self.root)
+            progress_win.grab_set()
+
+            tk.Label(progress_win, text="📊 Сравнение выбранных методов",
+                    font=("Arial", 12, "bold")).pack(pady=10)
+
+            progress_label = tk.Label(progress_win, text="", font=("Arial", 10))
+            progress_label.pack(pady=5)
+
+            progress_bar = ttk.Progressbar(progress_win, length=400, mode='determinate')
+            progress_bar.pack(pady=10)
+            progress_bar['maximum'] = len(selected_methods)
+
+            comparison_results = []
+
+            for i, method in enumerate(selected_methods):
+                progress_label.config(text=f"Тестирование {i+1}/{len(selected_methods)}: {method.name}")
+                progress_bar['value'] = i
+                self.root.update()
+
+                start_time = time.time()
+                results = self.test_method_optimized(method, sample_askupo, eatool_df,
+                                                     askupo_col, eatool_col)
+                elapsed = time.time() - start_time
+
+                stats_dict = self.calculate_statistics(results)
+
+                stats = {
+                    'method': method.name,
+                    'library': method.library,
+                    'avg_score': results['Процент'].mean(),
+                    'perfect': stats_dict['perfect'],
+                    'high': stats_dict['high'],
+                    'medium': stats_dict['medium'],
+                    'time': elapsed
+                }
+
+                comparison_results.append(stats)
+
+            progress_win.destroy()
+
+            # Лексикографическая сортировка
+            comparison_results.sort(key=lambda x: (x['perfect'], x['high'], x['avg_score']),
+                                   reverse=True)
+
+            self.display_comparison(comparison_results)
+            self.notebook.select(1)
+
+            messagebox.showinfo("✅ Сравнение завершено!",
+                              f"Протестировано {len(selected_methods)} методов\n\n"
+                              f"🏆 Лучший: {comparison_results[0]['method']}\n"
+                              f"📊 100% совпадений: {comparison_results[0]['perfect']}")
+
         except Exception as e:
             messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
     
