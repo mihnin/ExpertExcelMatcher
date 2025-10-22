@@ -1440,23 +1440,9 @@ class ExpertMatcher:
             eatool_combined_names.append(combined)
             eatool_original_values.append(combined)
 
-        # DEBUG: Показываем размер данных
-        print(f"\n=== DANNYE DLYA SOPOSTAVLENIYA ===")
-        print(f"   Istochnik 1 (ASKUPO): {len(askupo_df)} zapisej")
-        print(f"   Istochnik 2 (EA Tool): {len(eatool_df)} zapisej")
-        print(f"   EA Tool combined names: {len(eatool_combined_names)} elementov")
-        if len(eatool_combined_names) > 0:
-            print(f"   Pervye 3 elementa EA Tool: {eatool_combined_names[:3]}")
-        else:
-            print(f"   PREDUPREZHDENIE: Istochnik 2 PUSTOJ!")
-
         # Нормализация для поиска
-        eatool_normalized = [self.engine.normalize_string(name) for name in eatool_combined_names]
+        eatool_normalized = [self.normalize_string(name) for name in eatool_combined_names]
         choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_original_values)}
-
-        print(f"   Normalizovannyh strok: {len(eatool_normalized)}")
-        if len(eatool_normalized) > 0:
-            print(f"   Pervye 3 normalizovannyh: {eatool_normalized[:3]}")
 
         # Создаём словарь для быстрого поиска строки по комбинированному значению
         eatool_row_dict = {}
