@@ -34,6 +34,7 @@ from src.models import MatchingMethod, MatchResult, MethodStatistics
 from src.matching_engine import MatchingEngine, NormalizationOptions
 from src.excel_exporter import ExcelExporter
 from src.data_manager import DataManager
+from src.ui_manager import UIManager
 from src.ui_components import (
     ScrollableFrame, TreeviewWithScrollbar, MethodSelectorListbox,
     FileSelectorWidget, create_label_frame, create_info_label_frame,
@@ -134,7 +135,9 @@ class ExpertMatcher:
 
         self.methods = self.register_all_methods()
 
-        self.create_widgets()
+        # Создаём менеджер UI (делегирует создание всех вкладок)
+        self.ui_manager = UIManager(self)
+        self.ui_manager.create_widgets()
 
     def _create_matching_engine(self) -> MatchingEngine:
         """Создание движка сопоставления с текущими настройками нормализации"""
