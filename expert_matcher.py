@@ -50,6 +50,42 @@ except ImportError:
     print("⚠️ jellyfish не установлен. Установите: pip install jellyfish")
 
 
+# ============================================================================
+# КОНСТАНТЫ
+# ============================================================================
+
+class AppConstants:
+    """Константы приложения"""
+    # Версия
+    VERSION = "2.1.0"
+    APP_TITLE = f"🔬 Expert Excel Matcher v{VERSION}"
+
+    # Названия столбцов в результатах
+    COL_SOURCE1_PREFIX = "Источник 1:"
+    COL_SOURCE2_PREFIX = "Источник 2:"
+    COL_PERCENT = "Процент совпадения"
+    COL_METHOD = "Метод"
+
+    # Пороги совпадения
+    THRESHOLD_PERFECT = 100
+    THRESHOLD_HIGH = 90
+    THRESHOLD_MEDIUM = 70
+    THRESHOLD_LOW = 50
+    THRESHOLD_REJECT = 50  # Ниже этого порога - отклоняем
+
+    # UI константы
+    WINDOW_MIN_WIDTH = 1000
+    WINDOW_MIN_HEIGHT = 700
+    WINDOW_SCALE = 0.8  # 80% от размера экрана
+
+    # Размеры sample для тестирования
+    SAMPLE_SIZE = 200
+
+
+# ============================================================================
+# КЛАССЫ
+# ============================================================================
+
 class MatchingMethod:
     """Класс для описания метода сопоставления"""
 
@@ -143,22 +179,22 @@ class ExpertMatcher:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("🔬 Expert Excel Matcher v2.0")
+        self.root.title(AppConstants.APP_TITLE)
 
         # Адаптивный размер окна
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
 
-        # 80% от размера экрана, минимум 1000x700
-        window_width = max(1000, int(screen_width * 0.8))
-        window_height = max(700, int(screen_height * 0.8))
+        # Адаптивный размер от экрана
+        window_width = max(AppConstants.WINDOW_MIN_WIDTH, int(screen_width * AppConstants.WINDOW_SCALE))
+        window_height = max(AppConstants.WINDOW_MIN_HEIGHT, int(screen_height * AppConstants.WINDOW_SCALE))
 
         # Центрирование окна
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
 
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        self.root.minsize(1000, 700)  # Минимальный размер окна
+        self.root.minsize(AppConstants.WINDOW_MIN_WIDTH, AppConstants.WINDOW_MIN_HEIGHT)
 
         self.askupo_file = None
         self.eatool_file = None
@@ -171,8 +207,8 @@ class ExpertMatcher:
         self.eatool_columns = []  # Список всех столбцов из источника 2
         self.selected_askupo_cols = []  # Выбранные столбцы для сравнения из источника 1
         self.selected_eatool_cols = []  # Выбранные столбцы для сравнения из источника 2
-        self.inherit_askupo_cols_var = tk.BooleanVar(value=False)  # Наследовать столбцы из источника 1
-        self.inherit_eatool_cols_var = tk.BooleanVar(value=True)   # Наследовать столбцы из источника 2
+        self.inherit_askupo_cols_var = tk.BooleanVar(value=True)  # Наследовать столбцы из источника 1
+        self.inherit_eatool_cols_var = tk.BooleanVar(value=True)  # Наследовать столбцы из источника 2
         self.multi_column_mode_var = tk.BooleanVar(value=False)    # Режим сравнения по нескольким столбцам
         self.selected_methods = []  # Выбранные методы для режима "Выбор нескольких методов"
 
@@ -285,7 +321,89 @@ class ExpertMatcher:
                     values.append(str(val).strip())
 
         return " ".join(values) if values else ""
-    
+
+    # ========================================================================
+    # ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ (рефакторинг v2.1)
+    # ========================================================================
+
+    def _get_column_display_name(self, columns: List[str]) -> str:
+        """Получить отображаемое имя для списка столбцов
+
+        Args:
+            columns: список имен столбцов
+
+        Returns:
+            Строка вида "Col1" или "Col1 + Col2"
+        """
+        return " + ".join(columns) if len(columns) > 1 else columns[0]
+
+    def _get_selected_columns(self):
+        """Получить выбранные столбцы или дефолтные
+
+        Returns:
+            Tuple[List[str], List[str]]: (askupo_cols, eatool_cols)
+        """
+        askupo_cols = self.selected_askupo_cols if self.selected_askupo_cols else []
+        eatool_cols = self.selected_eatool_cols if self.selected_eatool_cols else []
+        return askupo_cols, eatool_cols
+
+    def _create_result_row_dict(self, askupo_combined: str, best_match: str,
+                                best_score: float, method_name: str,
+                                askupo_row: pd.Series, askupo_df: pd.DataFrame,
+                                eatool_row_dict: dict, eatool_df: pd.DataFrame) -> dict:
+        """Создать словарь строки результата (устраняет дублирование кода)
+
+        Args:
+            askupo_combined: объединенное значение из источника 1
+            best_match: найденное совпадение из источника 2
+            best_score: процент совпадения
+            method_name: название метода
+            askupo_row: строка из DataFrame источника 1
+            askupo_df: весь DataFrame источника 1
+            eatool_row_dict: словарь для поиска строк источника 2
+            eatool_df: весь DataFrame источника 2
+
+        Returns:
+            Словарь с полями результата
+        """
+        askupo_cols, eatool_cols = self._get_selected_columns()
+
+        # Формируем названия столбцов
+        askupo_col_name = self._get_column_display_name(askupo_cols)
+        eatool_col_name = self._get_column_display_name(eatool_cols)
+
+        # Базовые поля
+        result_row = {
+            f'{AppConstants.COL_SOURCE1_PREFIX} {askupo_col_name}': askupo_combined,
+            f'{AppConstants.COL_SOURCE2_PREFIX} {eatool_col_name}': best_match,
+            AppConstants.COL_PERCENT: round(best_score, 1),
+            AppConstants.COL_METHOD: method_name
+        }
+
+        # Наследование столбцов из источника 1
+        if self.inherit_askupo_cols_var.get():
+            for col in askupo_df.columns:
+                if col not in askupo_cols:
+                    result_row[f"{AppConstants.COL_SOURCE1_PREFIX} {col}"] = askupo_row[col]
+
+        # Наследование столбцов из источника 2
+        if best_match and self.inherit_eatool_cols_var.get():
+            matched_row = eatool_row_dict.get(best_match)
+            if matched_row is not None:
+                for col in eatool_df.columns:
+                    if col not in eatool_cols:
+                        result_row[f"{AppConstants.COL_SOURCE2_PREFIX} {col}"] = matched_row[col]
+        elif self.inherit_eatool_cols_var.get():
+            for col in eatool_df.columns:
+                if col not in eatool_cols:
+                    result_row[f"{AppConstants.COL_SOURCE2_PREFIX} {col}"] = ""
+
+        return result_row
+
+    # ========================================================================
+    # СТАТИСТИКА
+    # ========================================================================
+
     def calculate_statistics(self, results_df: pd.DataFrame) -> Dict:
         """
         ИСПРАВЛЕННАЯ функция подсчета статистики!
@@ -294,12 +412,12 @@ class ExpertMatcher:
         total = len(results_df)
         
         # Категории (НЕ накопительные!)
-        perfect = len(results_df[results_df['Процент'] == 100])
-        high = len(results_df[(results_df['Процент'] >= 90) & (results_df['Процент'] < 100)])
-        medium = len(results_df[(results_df['Процент'] >= 70) & (results_df['Процент'] < 90)])
-        low = len(results_df[(results_df['Процент'] >= 50) & (results_df['Процент'] < 70)])
-        very_low = len(results_df[(results_df['Процент'] > 0) & (results_df['Процент'] < 50)])
-        none = len(results_df[results_df['Процент'] == 0])
+        perfect = len(results_df[results_df['Процент совпадения'] == 100])
+        high = len(results_df[(results_df['Процент совпадения'] >= 90) & (results_df['Процент совпадения'] < 100)])
+        medium = len(results_df[(results_df['Процент совпадения'] >= 70) & (results_df['Процент совпадения'] < 90)])
+        low = len(results_df[(results_df['Процент совпадения'] >= 50) & (results_df['Процент совпадения'] < 70)])
+        very_low = len(results_df[(results_df['Процент совпадения'] > 0) & (results_df['Процент совпадения'] < 50)])
+        none = len(results_df[results_df['Процент совпадения'] == 0])
         
         # ПРОВЕРКА: сумма должна быть равна total
         check_sum = perfect + high + medium + low + very_low + none
@@ -391,10 +509,11 @@ class ExpertMatcher:
    • Кодировка: любая (автоматически определяется)
    • Название файла: ЛЮБОЕ (без ограничений)
 
-✅ СТРУКТУРА ФАЙЛОВ:
-   • Первый столбец ОБЯЗАТЕЛЬНО должен содержать названия программного обеспечения
-   • Название первого столбца: ЛЮБОЕ (не имеет значения)
-   • Остальные столбцы: могут быть любыми (игнорируются приложением)
+✅ СТРУКТУРА ФАЙЛОВ (v2.1 - гибкий выбор столбцов):
+   • Можно выбрать ЛЮБОЙ столбец(цы) из каждого источника для сравнения
+   • Поддержка сравнения по 1 или 2 столбцам одновременно
+   • Чекбоксы для наследования остальных столбцов в результат
+   • По умолчанию: оба источника наследуют все столбцы
 
 📋 ПРИМЕРЫ ДОПУСТИМЫХ СТРУКТУР:
 
@@ -415,9 +534,10 @@ class ExpertMatcher:
    └────────────────────────────┴──────────┘
 
 ⚠️ ВАЖНО:
-   • Первый столбец должен содержать ТЕКСТ (не числа, не даты)
-   • Пустые строки в первом столбце будут пропущены
+   • Выбранные столбцы должны содержать ТЕКСТ (не числа, не даты)
+   • Пустые строки в выбранных столбцах будут пропущены
    • Регистр букв не важен (всё приводится к нижнему регистру)
+   • При выборе 2 столбцов они объединяются через " + "
 """
 
         tk.Label(section1, text=help_text_files, font=("Consolas", 9),
@@ -450,15 +570,60 @@ class ExpertMatcher:
    • Вы выбираете один конкретный метод из списка
    • Применяет его ко всем данным
    • Время: 2-3 минуты
+
+5️⃣ ВЫБОР НЕСКОЛЬКИХ МЕТОДОВ (NEW в v2.1):
+   • Вы выбираете несколько конкретных методов из списка
+   • Применяет каждый метод последовательно ко всем данным
+   • Создаёт Excel файл с листом для каждого выбранного метода
+   • Время: зависит от количества выбранных методов (~2-3 мин/метод)
 """
 
         tk.Label(section2, text=help_text_modes, font=("Consolas", 9),
                 justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
 
-        # Раздел 3: Экспорт результатов
-        section3 = tk.LabelFrame(scrollable_frame, text="💾 Экспорт результатов",
+        # Раздел 3: Выбор столбцов (NEW в v2.1)
+        section3 = tk.LabelFrame(scrollable_frame, text="🎯 Выбор столбцов для сравнения (NEW в v2.1)",
                                 font=("Arial", 11, "bold"), padx=15, pady=10, bg="white")
         section3.pack(fill=tk.X, pady=(0, 15))
+
+        help_text_columns = """
+🔹 ВЫБОР СТОЛБЦОВ:
+   • После загрузки каждого файла появляется список его столбцов
+   • Можно выбрать 1 или 2 столбца для сравнения (множественный выбор)
+   • При выборе 2 столбцов их значения объединяются через " + "
+   • Если не выбрано ничего - используется первый столбец по умолчанию
+
+🔹 НАСЛЕДОВАНИЕ СТОЛБЦОВ (чекбоксы):
+   • "Наследовать остальные столбцы источника 1" - ВКЛ по умолчанию
+   • "Наследовать остальные столбцы источника 2" - ВКЛ по умолчанию
+   • Наследуемые столбцы получают префикс: "Источник 1: [имя]"
+   • Отключите чекбокс, если не нужны дополнительные столбцы
+
+📋 ПРИМЕР:
+   Источник 1 имеет столбцы: [Название ПО, Версия, Vendor]
+   Источник 2 имеет столбцы: [Product Name, Category]
+
+   Вы выбираете для сравнения:
+   • Источник 1: "Название ПО"
+   • Источник 2: "Product Name"
+
+   В результате будут столбцы:
+   • Источник 1: Название ПО
+   • Источник 1: Версия (если чекбокс ВКЛ)
+   • Источник 1: Vendor (если чекбокс ВКЛ)
+   • Источник 2: Product Name
+   • Источник 2: Category (если чекбокс ВКЛ)
+   • Процент совпадения
+   • Метод
+"""
+
+        tk.Label(section3, text=help_text_columns, font=("Consolas", 9),
+                justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
+
+        # Раздел 4: Экспорт результатов
+        section4 = tk.LabelFrame(scrollable_frame, text="💾 Экспорт результатов",
+                                font=("Arial", 11, "bold"), padx=15, pady=10, bg="white")
+        section4.pack(fill=tk.X, pady=(0, 15))
 
         help_text_export = """
 📊 ПОЛНЫЙ ОТЧЁТ:
@@ -479,15 +644,21 @@ class ExpertMatcher:
    • Требуется ручной поиск или добавление
 """
 
-        tk.Label(section3, text=help_text_export, font=("Consolas", 9),
+        tk.Label(section4, text=help_text_export, font=("Consolas", 9),
                 justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
 
-        # Раздел 4: Библиотеки
-        section4 = tk.LabelFrame(scrollable_frame, text="📚 Используемые библиотеки",
+        # Раздел 5: Библиотеки
+        section5 = tk.LabelFrame(scrollable_frame, text="📚 Используемые библиотеки",
                                 font=("Arial", 11, "bold"), padx=15, pady=10, bg="white")
-        section4.pack(fill=tk.X, pady=(0, 15))
+        section5.pack(fill=tk.X, pady=(0, 15))
 
         help_text_libs = """
+🏠 BUILTIN (встроенные методы):
+   • Точное совпадение (ВПР) - аналог Excel VLOOKUP
+   • Возвращает 100% при точном совпадении, 0% при несовпадении
+   • Мгновенная работа, не требует внешних библиотек
+   • Полезно для точного поиска без приблизительного сопоставления
+
 🔬 RAPIDFUZZ (рекомендуется):
    • Самая быстрая библиотека (в 100 раз быстрее аналогов)
    • Методы: WRatio, Token Set, Token Sort, Partial Ratio и др.
@@ -504,15 +675,29 @@ class ExpertMatcher:
    • Полезно для имён и названий с опечатками
 """
 
-        tk.Label(section4, text=help_text_libs, font=("Consolas", 9),
+        tk.Label(section5, text=help_text_libs, font=("Consolas", 9),
                 justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
 
-        # Раздел 5: Подробное описание методов
-        section5 = tk.LabelFrame(scrollable_frame, text="🔍 Подробное описание всех методов сопоставления",
+        # Раздел 6: Подробное описание методов
+        section6 = tk.LabelFrame(scrollable_frame, text="🔍 Подробное описание всех методов сопоставления",
                                 font=("Arial", 11, "bold"), padx=15, pady=10, bg="white")
-        section5.pack(fill=tk.X, pady=(0, 15))
+        section6.pack(fill=tk.X, pady=(0, 15))
 
         help_text_methods = """
+═══════════════════════════════════════════════════════════════════
+🏠 ВСТРОЕННЫЕ МЕТОДЫ (1 метод) - NEW в v2.1
+═══════════════════════════════════════════════════════════════════
+
+0️⃣ Точное совпадение (ВПР) 📌
+   ОПИСАНИЕ: Аналог функции VLOOKUP в Excel - точное сопоставление
+   КАК РАБОТАЕТ: Сравнивает нормализованные строки на полное совпадение
+   ПРИМЕР:
+      "Microsoft Office" vs "microsoft office" → 100% (игнор регистра)
+      "Microsoft Office" vs "MS Office" → 0% (не совпадает)
+      "Chrome" vs "Chrome Browser" → 0% (не совпадает)
+   КОГДА ИСПОЛЬЗОВАТЬ: Когда нужно ТОЧНОЕ совпадение без приближения
+   ОСОБЕННОСТИ: Мгновенная работа, возвращает только 100% или 0%
+
 ═══════════════════════════════════════════════════════════════════
 📚 БИБЛИОТЕКА RAPIDFUZZ (10 методов)
 ═══════════════════════════════════════════════════════════════════
@@ -652,6 +837,7 @@ class ExpertMatcher:
 💡 СОВЕТЫ ПО ВЫБОРУ МЕТОДА
 ═══════════════════════════════════════════════════════════════════
 
+📌 Точное совпадение → Точное совпадение (ВПР)
 🎯 Общий случай → WRatio (автоматический выбор стратегии)
 📝 Разный порядок слов → Token Set / Token Sort
 ✂️ Короткое vs полное → Partial Ratio / Partial Token Set
@@ -660,7 +846,7 @@ class ExpertMatcher:
 🎲 Не уверены → Запустите режим "Сравнение методов"!
 """
 
-        tk.Label(section5, text=help_text_methods, font=("Consolas", 8),
+        tk.Label(section6, text=help_text_methods, font=("Consolas", 8),
                 justify=tk.LEFT, anchor="w", bg="white").pack(fill=tk.X)
 
         canvas.pack(side="left", fill="both", expand=True)
@@ -998,9 +1184,9 @@ class ExpertMatcher:
         
         headers = [
             ("num", "№", 50),
-            ("askupo", "Источник данных 1 (целевой)", 350),
-            ("eatool", "Источник данных 2", 350),
-            ("percent", "Совпадение %", 120),
+            ("askupo", "Источник 1 (сравниваемый столбец)", 350),
+            ("eatool", "Источник 2 (сопоставленный столбец)", 350),
+            ("percent", "Процент совпадения", 120),
         ]
         
         for col, text, width in headers:
@@ -1398,7 +1584,7 @@ class ExpertMatcher:
                 stats = {
                     'method': method.name,
                     'library': method.library,
-                    'avg_score': results['Процент'].mean(),
+                    'avg_score': results['Процент совпадения'].mean(),
                     'perfect': stats_dict['perfect'],      # Только 100%
                     'high': stats_dict['high'],            # Только 90-99%
                     'medium': stats_dict['medium'],        # Только 70-89%
@@ -1638,7 +1824,7 @@ class ExpertMatcher:
                 stats = {
                     'method': method.name,
                     'library': method.library,
-                    'avg_score': results['Процент'].mean(),
+                    'avg_score': results['Процент совпадения'].mean(),
                     'perfect': stats_dict['perfect'],
                     'high': stats_dict['high'],
                     'medium': stats_dict['medium'],
@@ -1679,7 +1865,7 @@ class ExpertMatcher:
 
         # Лексикографическая оценка (приоритет: 100% > 90-99% > средний)
         # Идентична логике сортировки в режиме сравнения
-        score = (stats['perfect'], stats['high'], results['Процент'].mean())
+        score = (stats['perfect'], stats['high'], results['Процент совпадения'].mean())
 
         return score
     
@@ -1730,36 +1916,22 @@ class ExpertMatcher:
                 choice_dict
             )
 
-            if best_score < 50:
+            # Применяем порог отклонения
+            if best_score < AppConstants.THRESHOLD_REJECT:
                 best_match = ""
                 best_score = 0
 
-            # Базовые поля результата
-            result_row = {
-                'Источник данных 1 (целевой)': askupo_combined,
-                'Источник данных 2': best_match,
-                'Процент': round(best_score, 1),
-                'Метод': method.name
-            }
-
-            # Наследование столбцов из источника 1
-            if self.inherit_askupo_cols_var.get():
-                for col in askupo_df.columns:
-                    if col not in askupo_cols:  # Пропускаем уже использованные для сравнения
-                        result_row[f"Источник1_{col}"] = row[col]
-
-            # Наследование столбцов из источника 2
-            if best_match and self.inherit_eatool_cols_var.get():
-                matched_row = eatool_row_dict.get(best_match)
-                if matched_row is not None:
-                    for col in eatool_df.columns:
-                        if col not in eatool_cols:  # Пропускаем уже использованные для сравнения
-                            result_row[f"Источник2_{col}"] = matched_row[col]
-            elif self.inherit_eatool_cols_var.get():
-                # Если нет совпадения, добавляем пустые значения
-                for col in eatool_df.columns:
-                    if col not in eatool_cols:
-                        result_row[f"Источник2_{col}"] = ""
+            # Используем вспомогательный метод (рефакторинг v2.1 - устранение дублирования)
+            result_row = self._create_result_row_dict(
+                askupo_combined=askupo_combined,
+                best_match=best_match,
+                best_score=best_score,
+                method_name=method.name,
+                askupo_row=row,
+                askupo_df=askupo_df,
+                eatool_row_dict=eatool_row_dict,
+                eatool_df=eatool_df
+            )
 
             results.append(result_row)
 
@@ -1818,30 +1990,22 @@ class ExpertMatcher:
                 choice_dict
             )
 
-            if best_score < 50:
+            # Применяем порог отклонения
+            if best_score < AppConstants.THRESHOLD_REJECT:
                 best_match = ""
                 best_score = 0
 
-            # Базовые поля
-            result_row = {
-                'Источник данных 1 (целевой)': askupo_name,
-                'Источник данных 2': best_match,
-                'Процент': round(best_score, 1),
-                'Метод': method.name
-            }
-
-            # Добавляем ВСЕ остальные столбцы из Источника 2 (если есть совпадение)
-            if best_match:
-                matched_row = eatool_row_dict.get(best_match)
-                if matched_row is not None:
-                    for col in eatool_df.columns:
-                        if col != eatool_col:  # Пропускаем первый столбец (он уже есть)
-                            result_row[col] = matched_row[col]
-            else:
-                # Если нет совпадения, добавляем пустые значения для всех столбцов
-                for col in eatool_df.columns:
-                    if col != eatool_col:
-                        result_row[col] = ""
+            # Используем вспомогательный метод (рефакторинг v2.1 - устранение дублирования)
+            result_row = self._create_result_row_dict(
+                askupo_combined=askupo_name,
+                best_match=best_match,
+                best_score=best_score,
+                method_name=method.name,
+                askupo_row=row,
+                askupo_df=askupo_df,
+                eatool_row_dict=eatool_row_dict,
+                eatool_df=eatool_df
+            )
 
             results.append(result_row)
             
@@ -1857,7 +2021,7 @@ class ExpertMatcher:
         progress_bar['value'] = total
         self.root.update()
         
-        self.results = pd.DataFrame(results).sort_values('Процент', ascending=False)
+        self.results = pd.DataFrame(results).sort_values('Процент совпадения', ascending=False)
         
         progress_win.destroy()
         
@@ -1950,17 +2114,22 @@ class ExpertMatcher:
             self.results_tree.delete(item)
         
         for idx, row in self.results.head(50).iterrows():
-            source1 = str(row['Источник данных 1 (целевой)'])
-            source2 = str(row['Источник данных 2']) if row['Источник данных 2'] else ""
+            # Названия столбцов теперь динамические, используем первый и второй столбец
+            col_names = self.results.columns.tolist()
+            source1_col = [c for c in col_names if c.startswith('Источник 1:')][0]
+            source2_col = [c for c in col_names if c.startswith('Источник 2:')][0]
+
+            source1 = str(row[source1_col])
+            source2 = str(row[source2_col]) if row[source2_col] else ""
 
             values = (
                 idx + 1,
                 source1[:50] + "..." if len(source1) > 50 else source1,
                 source2[:50] + "..." if source2 and len(source2) > 50 else source2 if source2 else "❌ НЕТ",
-                f"{row['Процент']}%"
+                f"{row['Процент совпадения']}%"
             )
 
-            percent = row['Процент']
+            percent = row['Процент совпадения']
             tag = 'perfect' if percent == 100 else 'high' if percent >= 90 else 'medium' if percent >= 70 else 'low' if percent >= 50 else 'very_low' if percent > 0 else 'none'
 
             self.results_tree.insert("", tk.END, values=values, tags=(tag,))
@@ -2037,19 +2206,19 @@ class ExpertMatcher:
     def export_perfect(self):
         if self.results is None:
             return
-        data = self.results[self.results['Процент'] == 100]
+        data = self.results[self.results['Процент совпадения'] == 100]
         self.export_excel(data, "Точные_совпадения_100%.xlsx")
     
     def export_problems(self):
         if self.results is None:
             return
-        data = self.results[self.results['Процент'] < 90]
+        data = self.results[self.results['Процент совпадения'] < 90]
         self.export_excel(data, "Требуют_проверки_менее_90%.xlsx")
     
     def export_no_match(self):
         if self.results is None:
             return
-        data = self.results[self.results['Процент'] == 0]
+        data = self.results[self.results['Процент совпадения'] == 0]
         self.export_excel(data, "Без_совпадений_0%.xlsx")
     
     def export_excel(self, data: pd.DataFrame, filename: str, include_stats: bool = False):
@@ -2097,7 +2266,7 @@ class ExpertMatcher:
                     col_name = data_to_export.columns[col_num]
                     if 'Источник данных' in str(col_name):
                         worksheet.set_column(col_num, col_num, 45)  # Широкие столбцы для названий
-                    elif col_name == 'Процент':
+                    elif col_name == 'Процент совпадения':
                         worksheet.set_column(col_num, col_num, 12)  # Узкий для процента
                     elif col_name == 'Метод':
                         worksheet.set_column(col_num, col_num, 35)  # Средний для метода
@@ -2114,7 +2283,7 @@ class ExpertMatcher:
                 }
                 
                 for row_num in range(1, len(data_to_export) + 1):
-                    percent = data_to_export.iloc[row_num - 1]['Процент']
+                    percent = data_to_export.iloc[row_num - 1]['Процент совпадения']
                     
                     if percent == 100:
                         fmt = formats[100]
@@ -2273,7 +2442,7 @@ class ExpertMatcher:
                         col_name = export_df.columns[col_num]
                         if 'Источник данных' in str(col_name):
                             worksheet.set_column(col_num, col_num, 45)  # Широкие столбцы для названий
-                        elif col_name == 'Процент':
+                        elif col_name == 'Процент совпадения':
                             worksheet.set_column(col_num, col_num, 12)  # Узкий для процента
                         elif col_name == 'Метод':
                             worksheet.set_column(col_num, col_num, 35)  # Средний для метода
@@ -2282,7 +2451,7 @@ class ExpertMatcher:
 
                     # Цветовая раскраска по проценту совпадения
                     for row_num in range(1, len(export_df) + 1):
-                        percent = export_df.iloc[row_num - 1]['Процент']
+                        percent = export_df.iloc[row_num - 1]['Процент совпадения']
 
                         if percent == 100:
                             fmt = formats[100]

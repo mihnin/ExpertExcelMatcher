@@ -4,9 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python-based fuzzy string matching application called "Expert Excel Matcher" designed to match software product names between two Excel databases (АСКУПО and EA Tool). The application uses a tkinter GUI and implements multiple fuzzy matching algorithms to find the best correspondences between product names.
+This is a Python-based fuzzy string matching application called "Expert Excel Matcher v2.1" designed to match software product names between two Excel databases. The application uses a tkinter GUI and implements multiple fuzzy matching algorithms to find the best correspondences between product names.
 
-**Key Feature**: Tests ALL available methods (not just top 5), with dynamic time estimation based on method types.
+**Version**: 2.1.0
+**Last Refactored**: 2025-10-22
+
+**Key Features**:
+- Tests ALL available methods (not just top 5)
+- Dynamic time estimation based on method types
+- Adaptive UI with scrolling support
+- Multiple column comparison (1-2 columns)
+- Custom column selection and inheritance
+- Built-in Exact Match (ВПР) method
+- Refactored codebase with helper methods and constants (v2.1)
 
 ## Commands
 
