@@ -143,14 +143,23 @@ class ExpertMatcher:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("🔬 Expert Excel Matcher v1.0")
-        self.root.geometry("1200x800")
-        
+        self.root.title("🔬 Expert Excel Matcher v2.0")
+        self.root.geometry("1200x900")
+
         self.askupo_file = None
         self.eatool_file = None
         self.results = None
         self.methods_comparison = None
         self.full_comparison_results = None  # Для хранения полных результатов всех методов
+
+        # Новые переменные для работы со столбцами
+        self.askupo_columns = []  # Список всех столбцов из источника 1
+        self.eatool_columns = []  # Список всех столбцов из источника 2
+        self.selected_askupo_cols = []  # Выбранные столбцы для сравнения из источника 1
+        self.selected_eatool_cols = []  # Выбранные столбцы для сравнения из источника 2
+        self.inherit_askupo_cols_var = tk.BooleanVar(value=False)  # Наследовать столбцы из источника 1
+        self.inherit_eatool_cols_var = tk.BooleanVar(value=True)   # Наследовать столбцы из источника 2
+        self.multi_column_mode_var = tk.BooleanVar(value=False)    # Режим сравнения по нескольким столбцам
 
         self.methods = self.register_all_methods()
 
@@ -215,9 +224,26 @@ class ExpertMatcher:
                 MatchingMethod("Jellyfish: Jaro",
                              jellyfish.jaro_similarity, "jellyfish"),
             ])
-        
+
+        # Всегда добавляем метод точного совпадения (ВПР)
+        methods.append(
+            MatchingMethod("📊 Exact Match (ВПР)",
+                         self.exact_match_func, "builtin",
+                         use_process=False, scorer=None)
+        )
+
         return methods
     
+    def exact_match_func(self, s1: str, s2: str) -> float:
+        """Функция точного совпадения для метода ВПР
+
+        Возвращает 100.0 для точного совпадения (после нормализации),
+        0.0 для несовпадения
+        """
+        norm_s1 = self.normalize_string(s1)
+        norm_s2 = self.normalize_string(s2)
+        return 100.0 if norm_s1 == norm_s2 else 0.0
+
     def normalize_string(self, s: str) -> str:
         """Нормализация строки"""
         if not s or pd.isna(s):
@@ -225,6 +251,25 @@ class ExpertMatcher:
         s = str(s).lower().strip()
         s = re.sub(r'\s+', ' ', s)
         return s
+
+    def combine_columns(self, row: pd.Series, columns: List[str]) -> str:
+        """Объединение значений из нескольких столбцов в одну строку
+
+        Args:
+            row: строка DataFrame
+            columns: список столбцов для объединения
+
+        Returns:
+            Объединенная строка (разделитель: пробел)
+        """
+        values = []
+        for col in columns:
+            if col in row.index:
+                val = row[col]
+                if not pd.isna(val) and str(val).strip():
+                    values.append(str(val).strip())
+
+        return " ".join(values) if values else ""
     
     def calculate_statistics(self, results_df: pd.DataFrame) -> Dict:
         """
@@ -699,7 +744,80 @@ class ExpertMatcher:
         method_combo.pack(anchor=tk.W, padx=20, pady=3)
         if self.methods:
             method_combo.current(0)
-        
+
+        # ==== НОВАЯ СЕКЦИЯ: Выбор столбцов для сравнения ====
+        columns_frame = tk.LabelFrame(main_frame, text="Выбор столбцов для сравнения",
+                                      font=("Arial", 11, "bold"), padx=10, pady=10)
+        columns_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # Контейнер для двух источников
+        columns_container = tk.Frame(columns_frame)
+        columns_container.pack(fill=tk.X)
+
+        # Источник 1 (левая колонка)
+        source1_frame = tk.Frame(columns_container)
+        source1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        tk.Label(source1_frame, text="📂 Источник данных 1 (целевой):",
+                font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
+
+        tk.Label(source1_frame, text="Выберите столбцы для сравнения (1-2 столбца):",
+                font=("Arial", 9)).pack(anchor=tk.W)
+
+        listbox_frame1 = tk.Frame(source1_frame)
+        listbox_frame1.pack(fill=tk.BOTH, expand=True)
+
+        scrollbar1 = tk.Scrollbar(listbox_frame1)
+        scrollbar1.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.askupo_col_listbox = tk.Listbox(listbox_frame1, selectmode=tk.MULTIPLE,
+                                             height=5, yscrollcommand=scrollbar1.set,
+                                             exportselection=False)
+        self.askupo_col_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar1.config(command=self.askupo_col_listbox.yview)
+        self.askupo_col_listbox.bind('<<ListboxSelect>>', self.on_askupo_column_select)
+
+        tk.Checkbutton(source1_frame, text="Наследовать остальные столбцы источника 1",
+                      variable=self.inherit_askupo_cols_var,
+                      font=("Arial", 9)).pack(anchor=tk.W, pady=(5, 0))
+
+        # Источник 2 (правая колонка)
+        source2_frame = tk.Frame(columns_container)
+        source2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        tk.Label(source2_frame, text="📂 Источник данных 2:",
+                font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
+
+        tk.Label(source2_frame, text="Выберите столбцы для сравнения (1-2 столбца):",
+                font=("Arial", 9)).pack(anchor=tk.W)
+
+        listbox_frame2 = tk.Frame(source2_frame)
+        listbox_frame2.pack(fill=tk.BOTH, expand=True)
+
+        scrollbar2 = tk.Scrollbar(listbox_frame2)
+        scrollbar2.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.eatool_col_listbox = tk.Listbox(listbox_frame2, selectmode=tk.MULTIPLE,
+                                             height=5, yscrollcommand=scrollbar2.set,
+                                             exportselection=False)
+        self.eatool_col_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar2.config(command=self.eatool_col_listbox.yview)
+        self.eatool_col_listbox.bind('<<ListboxSelect>>', self.on_eatool_column_select)
+
+        tk.Checkbutton(source2_frame, text="Наследовать остальные столбцы источника 2",
+                      variable=self.inherit_eatool_cols_var,
+                      font=("Arial", 9)).pack(anchor=tk.W, pady=(5, 0))
+
+        # Чекбокс для режима множественных столбцов
+        tk.Checkbutton(columns_frame,
+                      text="🔗 Режим сравнения по 2 столбцам одновременно (требует выбора 2 столбцов в каждом источнике)",
+                      variable=self.multi_column_mode_var,
+                      font=("Arial", 9, "bold"), fg="#7C3AED").pack(anchor=tk.W, pady=(10, 0))
+
+        tk.Label(columns_frame,
+                text="💡 Подсказка: После выбора файлов, столбцы появятся в списках. Выберите 1-2 столбца для сравнения.",
+                font=("Arial", 8), fg="gray", wraplength=700, justify=tk.LEFT).pack(anchor=tk.W, pady=(5, 0))
+
         self.process_btn = tk.Button(main_frame, text="🚀 Начать обработку",
                  command=self.start_processing, bg="#7C3AED", fg="white",
                  font=("Arial", 13, "bold"), padx=50, pady=12,
@@ -874,6 +992,9 @@ class ExpertMatcher:
             if len(display_name) > 50:
                 display_name = display_name[:47] + "..."
             self.askupo_label.config(text=f"✅ {display_name}", fg="green", font=("Arial", 9, "bold"))
+
+            # Загрузка столбцов из файла
+            self.load_askupo_columns()
             self.check_ready()
     
     def select_eatool(self):
@@ -899,14 +1020,115 @@ class ExpertMatcher:
             if len(display_name) > 50:
                 display_name = display_name[:47] + "..."
             self.eatool_label.config(text=f"✅ {display_name}", fg="green", font=("Arial", 9, "bold"))
+
+            # Загрузка столбцов из файла
+            self.load_eatool_columns()
             self.check_ready()
     
     def check_ready(self):
         if self.askupo_file and self.eatool_file:
             self.process_btn.config(state=tk.NORMAL)
-    
+
+    def load_askupo_columns(self):
+        """Загрузка списка столбцов из источника 1"""
+        try:
+            df = pd.read_excel(self.askupo_file, nrows=0)  # Читаем только заголовки
+            self.askupo_columns = list(df.columns)
+
+            # Обновляем GUI для выбора столбцов
+            if hasattr(self, 'askupo_col_listbox'):
+                self.askupo_col_listbox.delete(0, tk.END)
+                for col in self.askupo_columns:
+                    self.askupo_col_listbox.insert(tk.END, col)
+                # По умолчанию выбираем первый столбец
+                if self.askupo_columns:
+                    self.askupo_col_listbox.selection_set(0)
+                    self.selected_askupo_cols = [self.askupo_columns[0]]
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить столбцы из источника 1:\n{str(e)}")
+
+    def load_eatool_columns(self):
+        """Загрузка списка столбцов из источника 2"""
+        try:
+            df = pd.read_excel(self.eatool_file, nrows=0)  # Читаем только заголовки
+            self.eatool_columns = list(df.columns)
+
+            # Обновляем GUI для выбора столбцов
+            if hasattr(self, 'eatool_col_listbox'):
+                self.eatool_col_listbox.delete(0, tk.END)
+                for col in self.eatool_columns:
+                    self.eatool_col_listbox.insert(tk.END, col)
+                # По умолчанию выбираем первый столбец
+                if self.eatool_columns:
+                    self.eatool_col_listbox.selection_set(0)
+                    self.selected_eatool_cols = [self.eatool_columns[0]]
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить столбцы из источника 2:\n{str(e)}")
+
+    def on_askupo_column_select(self, event):
+        """Обработчик выбора столбцов из источника 1"""
+        selected_indices = self.askupo_col_listbox.curselection()
+        self.selected_askupo_cols = [self.askupo_columns[i] for i in selected_indices]
+
+        # Ограничение: максимум 2 столбца
+        if len(selected_indices) > 2:
+            messagebox.showwarning("Предупреждение",
+                                 "Можно выбрать максимум 2 столбца.\n"
+                                 "Последний выбор будет отменен.")
+            # Отменяем последний выбор
+            self.askupo_col_listbox.selection_clear(selected_indices[-1])
+            self.selected_askupo_cols = self.selected_askupo_cols[:-1]
+
+    def on_eatool_column_select(self, event):
+        """Обработчик выбора столбцов из источника 2"""
+        selected_indices = self.eatool_col_listbox.curselection()
+        self.selected_eatool_cols = [self.eatool_columns[i] for i in selected_indices]
+
+        # Ограничение: максимум 2 столбца
+        if len(selected_indices) > 2:
+            messagebox.showwarning("Предупреждение",
+                                 "Можно выбрать максимум 2 столбца.\n"
+                                 "Последний выбор будет отменен.")
+            # Отменяем последний выбор
+            self.eatool_col_listbox.selection_clear(selected_indices[-1])
+            self.selected_eatool_cols = self.selected_eatool_cols[:-1]
+
     def start_processing(self):
         """Начать обработку"""
+        # Валидация выбранных столбцов
+        if not self.selected_askupo_cols:
+            messagebox.showerror("Ошибка",
+                               "Не выбраны столбцы из Источника данных 1!\n\n"
+                               "Выберите хотя бы 1 столбец для сравнения.")
+            return
+
+        if not self.selected_eatool_cols:
+            messagebox.showerror("Ошибка",
+                               "Не выбраны столбцы из Источника данных 2!\n\n"
+                               "Выберите хотя бы 1 столбец для сравнения.")
+            return
+
+        # Проверка режима множественных столбцов
+        if self.multi_column_mode_var.get():
+            if len(self.selected_askupo_cols) != 2:
+                messagebox.showerror("Ошибка",
+                                   "Режим сравнения по 2 столбцам требует выбора ровно 2 столбцов из Источника 1!\n\n"
+                                   f"Сейчас выбрано: {len(self.selected_askupo_cols)}")
+                return
+            if len(self.selected_eatool_cols) != 2:
+                messagebox.showerror("Ошибка",
+                                   "Режим сравнения по 2 столбцам требует выбора ровно 2 столбцов из Источника 2!\n\n"
+                                   f"Сейчас выбрано: {len(self.selected_eatool_cols)}")
+                return
+
+        # Проверка совместимости количества столбцов
+        if len(self.selected_askupo_cols) != len(self.selected_eatool_cols):
+            messagebox.showwarning("Предупреждение",
+                                  "Количество выбранных столбцов в обоих источниках должно совпадать!\n\n"
+                                  f"Источник 1: {len(self.selected_askupo_cols)} столбцов\n"
+                                  f"Источник 2: {len(self.selected_eatool_cols)} столбцов\n\n"
+                                  "Для сравнения будет использован только первый столбец из каждого источника.")
+
         mode = self.mode_var.get()
 
         if mode == "auto":
@@ -1278,22 +1500,46 @@ class ExpertMatcher:
         return score
     
     def test_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame,
-                             eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str) -> pd.DataFrame:
-        """Оптимизированное тестирование метода"""
+                             eatool_df: pd.DataFrame, askupo_col: str = None, eatool_col: str = None) -> pd.DataFrame:
+        """Оптимизированное тестирование метода
 
-        eatool_names = eatool_df[eatool_col].tolist()
-        eatool_normalized = [self.normalize_string(name) for name in eatool_names]
-        choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_names)}
+        Поддерживает:
+        - Выбор конкретных столбцов для сравнения
+        - Режим множественных столбцов (2 столбца одновременно)
+        - Наследование дополнительных столбцов из источников
+        """
+        # Используем выбранные столбцы из GUI или переданные параметры
+        askupo_cols = self.selected_askupo_cols if self.selected_askupo_cols else [askupo_col if askupo_col else askupo_df.columns[0]]
+        eatool_cols = self.selected_eatool_cols if self.selected_eatool_cols else [eatool_col if eatool_col else eatool_df.columns[0]]
 
-        # Создаём словарь для быстрого поиска строки по оригинальному имени
-        eatool_row_dict = {str(row[eatool_col]): row for _, row in eatool_df.iterrows()}
+        # Подготовка данных из источника 2 для сравнения
+        eatool_combined_names = []
+        eatool_original_values = []
+
+        for _, row in eatool_df.iterrows():
+            # Объединяем значения из выбранных столбцов
+            combined = self.combine_columns(row, eatool_cols)
+            eatool_combined_names.append(combined)
+            eatool_original_values.append(combined)
+
+        # Нормализация для поиска
+        eatool_normalized = [self.normalize_string(name) for name in eatool_combined_names]
+        choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_original_values)}
+
+        # Создаём словарь для быстрого поиска строки по комбинированному значению
+        eatool_row_dict = {}
+        for idx, row in eatool_df.iterrows():
+            combined = self.combine_columns(row, eatool_cols)
+            eatool_row_dict[combined] = row
 
         results = []
 
         for _, row in askupo_df.iterrows():
-            askupo_name = str(row[askupo_col])
-            askupo_normalized = self.normalize_string(askupo_name)
+            # Объединяем значения из выбранных столбцов источника 1
+            askupo_combined = self.combine_columns(row, askupo_cols)
+            askupo_normalized = self.normalize_string(askupo_combined)
 
+            # Поиск лучшего совпадения
             best_match, best_score = method.find_best_match(
                 askupo_normalized,
                 eatool_normalized,
@@ -1304,26 +1550,32 @@ class ExpertMatcher:
                 best_match = ""
                 best_score = 0
 
-            # Базовые поля
+            # Базовые поля результата
             result_row = {
-                'Источник данных 1 (целевой)': askupo_name,
+                'Источник данных 1 (целевой)': askupo_combined,
                 'Источник данных 2': best_match,
                 'Процент': round(best_score, 1),
                 'Метод': method.name
             }
 
-            # Добавляем ВСЕ остальные столбцы из Источника 2 (если есть совпадение)
-            if best_match:
+            # Наследование столбцов из источника 1
+            if self.inherit_askupo_cols_var.get():
+                for col in askupo_df.columns:
+                    if col not in askupo_cols:  # Пропускаем уже использованные для сравнения
+                        result_row[f"Источник1_{col}"] = row[col]
+
+            # Наследование столбцов из источника 2
+            if best_match and self.inherit_eatool_cols_var.get():
                 matched_row = eatool_row_dict.get(best_match)
                 if matched_row is not None:
                     for col in eatool_df.columns:
-                        if col != eatool_col:  # Пропускаем первый столбец (он уже есть)
-                            result_row[col] = matched_row[col]
-            else:
-                # Если нет совпадения, добавляем пустые значения для всех столбцов
+                        if col not in eatool_cols:  # Пропускаем уже использованные для сравнения
+                            result_row[f"Источник2_{col}"] = matched_row[col]
+            elif self.inherit_eatool_cols_var.get():
+                # Если нет совпадения, добавляем пустые значения
                 for col in eatool_df.columns:
-                    if col != eatool_col:
-                        result_row[col] = ""
+                    if col not in eatool_cols:
+                        result_row[f"Источник2_{col}"] = ""
 
             results.append(result_row)
 
