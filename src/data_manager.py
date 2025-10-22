@@ -44,6 +44,8 @@ class DataManager:
             for encoding in encodings:
                 try:
                     df = pd.read_csv(filename, encoding=encoding, nrows=nrows)
+                    print(f"DEBUG: CSV файл прочитан с кодировкой {encoding}")
+                    print(f"DEBUG: Первые 3 значения первого столбца: {df.iloc[:3, 0].tolist()}")
                     return df
                 except (UnicodeDecodeError, Exception):
                     continue
@@ -52,6 +54,9 @@ class DataManager:
         else:
             # Excel файлы (.xlsx, .xls)
             df = pd.read_excel(filename, nrows=nrows)
+            print(f"DEBUG: Excel файл прочитан")
+            print(f"DEBUG: Расширение файла: {file_ext}")
+            print(f"DEBUG: Первые 3 значения первого столбца: {df.iloc[:3, 0].tolist()}")
 
         return df
 
