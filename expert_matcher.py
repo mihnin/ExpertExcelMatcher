@@ -553,32 +553,30 @@ class ExpertMatcher:
 
         help_text_modes = f"""
 1️⃣ АВТОМАТИЧЕСКИЙ РЕЖИМ (рекомендуется):
-   • Тестирует ВСЕ {len(self.methods)} доступных методов на образце данных
-   • Автоматически выбирает лучший метод
-   • Применяет его ко всем данным
-   • Время: 10-20 минут (зависит от количества методов)
+   • Тестирует ВЫБРАННЫЕ методы на образце данных (~200 записей)
+   • Автоматически выбирает лучший метод из выбранных
+   • Применяет его ко всем данным и создает результирующий Excel
+   • Выбор методов: удерживайте Ctrl для множественного выбора
+   • Если методы не выбраны - используются ВСЕ {len(self.methods)} доступных
+   • Время: зависит от количества выбранных методов
 
 2️⃣ РЕЖИМ СРАВНЕНИЯ (для анализа):
-   • Тестирует ВСЕ {len(self.methods)} методов на образце (~200 записей)
-   • Показывает статистику по каждому методу
-   • Позволяет выбрать метод вручную
-   • Время: 10-20 минут
+   • Тестирует ВЫБРАННЫЕ методы на выборке (не более первых 200 записей)
+   • Показывает статистику по каждому выбранному методу
+   • Выбирает лучший метод по критериям (100% > 90-99% > средний балл)
+   • Позволяет увидеть и сравнить результаты перед применением
+   • Если методы не выбраны - используются ВСЕ {len(self.methods)} доступных
+   • Время: зависит от количества выбранных методов
 
-3️⃣ ПОЛНОЕ СРАВНЕНИЕ (долгая операция):
-   • Применяет ВСЕ {len(self.methods)} методов ко ВСЕМ данным
-   • Создаёт Excel файл с листом для каждого метода
-   • Время: 30-60 минут (зависит от объёма данных)
+3️⃣ ПОЛНОЕ СРАВНЕНИЕ (может быть долгая операция):
+   • Выбор одного или нескольких методов для создания результирующего Excel
+   • Применяет КАЖДЫЙ выбранный метод ко ВСЕМ данным
+   • Создаёт Excel файл с листом для каждого метода + сводная таблица
+   • Выбор методов: удерживайте Ctrl для множественного выбора
+   • Если методы не выбраны - используются ВСЕ {len(self.methods)} доступных
+   • Время: зависит от количества выбранных методов и объёма данных
 
-4️⃣ РУЧНОЙ РЕЖИМ (выбор конкретного метода):
-   • Вы выбираете один конкретный метод из списка
-   • Применяет его ко всем данным
-   • Время: 2-3 минуты
-
-5️⃣ ВЫБОР НЕСКОЛЬКИХ МЕТОДОВ (NEW в v2.2):
-   • Вы выбираете несколько конкретных методов из списка
-   • Применяет каждый метод последовательно ко всем данным
-   • Создаёт Excel файл с листом для каждого выбранного метода
-   • Время: зависит от количества выбранных методов (~2-3 мин/метод)
+💡 СОВЕТ: Выбирайте только нужные методы для ускорения работы!
 """
 
         tk.Label(section2, text=help_text_modes, font=("Consolas", 9),
@@ -955,15 +953,16 @@ class ExpertMatcher:
   • Поддержка Excel (.xlsx, .xls) и CSV файлов
   • Сравнение по 1 или сразу 2 столбцам одновременно
   • 18 методов сопоставления: от простого ВПР до продвинутых алгоритмов
-  • Автоматический выбор оптимального метода сравнения
+  • Гибкий выбор методов: работа только с выбранными или со всеми сразу
   • Выбор любых столбцов из каждого источника для сравнения
 
-🎓 МЕТОДЫ СРАВНЕНИЯ:
+🎯 РЕЖИМЫ РАБОТЫ:
 
-  От базового точного совпадения (ВПР) до сложных fuzzy-алгоритмов,
-  учитывающих опечатки, разный порядок слов, сокращения и синонимы.
+  1. Автоматический - находит лучший метод из выбранных
+  2. Сравнение - показывает статистику по выбранным методам
+  3. Полное сравнение - применяет выбранные методы ко всем данным
 
-  📚 Подробное описание всех методов — в разделе "Справка"
+  📚 Подробное описание всех режимов и методов — в разделе "Справка"
 
 ⚡ РЕЗУЛЬТАТ: Точное сопоставление данных даже при неполном совпадении названий!
 """
@@ -1008,31 +1007,23 @@ class ExpertMatcher:
         self.mode_var = tk.StringVar(value="auto")
         
         tk.Radiobutton(mode_frame,
-                      text=f"🤖 Автоматический - тестирует ВСЕ {len(self.methods)} методов и выбирает лучший",
+                      text="🤖 Автоматический - тестирует ВЫБРАННЫЕ методы и выбрав лучший создает результирующий эксель",
                       variable=self.mode_var, value="auto",
                       font=("Arial", 9)).pack(anchor=tk.W, padx=20)
         tk.Radiobutton(mode_frame,
-                      text=f"📊 Сравнение методов (sample) - тестирует ВСЕ {len(self.methods)} методов и показывает статистику",
+                      text="📊 Сравнение выбранных методов - тестирует на выборке (не более первых 200 записей) и выбирает лучший",
                       variable=self.mode_var, value="compare",
                       font=("Arial", 9)).pack(anchor=tk.W, padx=20)
         tk.Radiobutton(mode_frame,
-                      text=f"🔬 Полное сравнение - применяет ВСЕ {len(self.methods)} методов ко ВСЕМ данным (долго! 30-60 мин)",
+                      text="🔬 Полное сравнение - выбор одного или нескольких методов для создания результирующего эксель",
                       variable=self.mode_var, value="full_compare",
-                      font=("Arial", 9)).pack(anchor=tk.W, padx=20)
-        tk.Radiobutton(mode_frame,
-                      text="⚙️ Выбор конкретного метода (~2-3 минуты) - применяет выбранный метод",
-                      variable=self.mode_var, value="manual",
-                      font=("Arial", 9)).pack(anchor=tk.W, padx=20)
-        tk.Radiobutton(mode_frame,
-                      text="🎯 Выбор нескольких методов (sample) - тестирует выбранные методы и показывает сравнение",
-                      variable=self.mode_var, value="multi_manual",
                       font=("Arial", 9)).pack(anchor=tk.W, padx=20)
 
         # Фрейм для выбора методов
         self.method_selector_frame = tk.Frame(settings_frame)
         self.method_selector_frame.pack(fill=tk.X, pady=5)
 
-        tk.Label(self.method_selector_frame, text="Выберите методы (для режимов ⚙️ и 🎯):",
+        tk.Label(self.method_selector_frame, text="Выберите методы (для всех режимов):",
                 font=("Arial", 9, "bold")).pack(anchor=tk.W, padx=20)
 
         tk.Label(self.method_selector_frame,
@@ -1491,35 +1482,29 @@ class ExpertMatcher:
                                   f"Источник 2: {len(self.selected_eatool_cols)} столбцов\n\n"
                                   "Для сравнения будет использован только первый столбец из каждого источника.")
 
-        # Валидация выбранных методов для режимов manual и multi_manual
+        # Валидация выбранных методов для ВСЕХ режимов
         mode = self.mode_var.get()
-        if mode in ("manual", "multi_manual"):
-            selected_methods = self.get_selected_methods()
-            if not selected_methods:
-                messagebox.showerror("Ошибка",
-                                   "Не выбраны методы!\n\n"
-                                   "Выберите хотя бы один метод из списка.")
-                return
+        selected_methods = self.get_selected_methods()
 
-            if mode == "manual" and len(selected_methods) > 1:
-                messagebox.showwarning("Предупреждение",
-                                      f"Для режима 'Выбор конкретного метода' выбрано {len(selected_methods)} методов.\n\n"
-                                      "Будет использован первый выбранный метод.\n"
-                                      "Для сравнения нескольких методов используйте режим '🎯 Выбор нескольких методов'.")
+        # Если методы не выбраны, используем все доступные
+        if not selected_methods:
+            # Выбираем все методы автоматически
+            for i in range(len(self.methods)):
+                self.methods_listbox.selection_set(i)
+            selected_methods = self.methods
+            messagebox.showinfo("Информация",
+                               f"Методы не были выбраны.\n\n"
+                               f"Будут использованы ВСЕ {len(self.methods)} доступных методов.")
 
         if mode == "auto":
-            self.run_auto_mode()
+            self.run_auto_mode(selected_methods)
         elif mode == "compare":
-            self.run_compare_mode()
+            self.run_compare_mode(selected_methods)
         elif mode == "full_compare":
-            self.run_full_comparison_mode()
-        elif mode == "multi_manual":
-            self.run_multi_manual_mode()
-        else:
-            self.run_manual_mode()
+            self.run_full_comparison_mode(selected_methods)
     
-    def run_auto_mode(self):
-        """Автоматический режим - выбор лучшего метода из ВСЕХ доступных
+    def run_auto_mode(self, selected_methods):
+        """Автоматический режим - выбор лучшего метода из ВЫБРАННЫХ
 
         Логика выбора ИДЕНТИЧНА режиму сравнения:
         - Приоритет 1: Максимум 100% совпадений
@@ -1536,14 +1521,14 @@ class ExpertMatcher:
             # Динамически рассчитываем примерное время
             sample_size = min(200, len(askupo_df))
             # RapidFuzz быстрые (~2 сек на метод), остальные медленнее (~15-20 сек на метод)
-            rapidfuzz_count = sum(1 for m in self.methods if m.use_process)
-            other_count = len(self.methods) - rapidfuzz_count
+            rapidfuzz_count = sum(1 for m in selected_methods if m.use_process)
+            other_count = len(selected_methods) - rapidfuzz_count
             estimated_time = (rapidfuzz_count * 2 + other_count * 20) / 60
 
             info_msg = (f"📂 Загружено:\n"
                        f"   АСКУПО: {len(askupo_df)} записей\n"
                        f"   EA Tool: {len(eatool_df)} записей\n\n"
-                       f"🔍 Будет протестировано ВСЕ {len(self.methods)} методов\n"
+                       f"🔍 Будет протестировано {len(selected_methods)} выбранных методов\n"
                        f"   • RapidFuzz методов: {rapidfuzz_count} (быстрые)\n"
                        f"   • Других методов: {other_count} (медленнее)\n"
                        f"⏱️ Примерное время: {estimated_time:.0f}-{estimated_time*1.5:.0f} минут")
@@ -1557,12 +1542,12 @@ class ExpertMatcher:
             best_score = (-1, -1, -1)  # Кортеж для лексикографического сравнения
 
             progress_win = tk.Toplevel(self.root)
-            progress_win.title("Тестирование ВСЕХ методов...")
+            progress_win.title("Тестирование выбранных методов...")
             progress_win.geometry("500x200")
             progress_win.transient(self.root)
             progress_win.grab_set()
 
-            tk.Label(progress_win, text="🔬 Тестирование ВСЕХ методов на sample данных",
+            tk.Label(progress_win, text="🔬 Тестирование выбранных методов на sample данных",
                     font=("Arial", 12, "bold")).pack(pady=10)
 
             progress_label = tk.Label(progress_win, text="", font=("Arial", 10))
@@ -1570,16 +1555,16 @@ class ExpertMatcher:
 
             progress_bar = ttk.Progressbar(progress_win, length=400, mode='determinate')
             progress_bar.pack(pady=10)
-            progress_bar['maximum'] = len(self.methods)
+            progress_bar['maximum'] = len(selected_methods)
 
             time_label = tk.Label(progress_win, text="", font=("Arial", 9), fg="gray")
             time_label.pack(pady=5)
 
             start_time = time.time()
 
-            for i, method in enumerate(self.methods):
+            for i, method in enumerate(selected_methods):
                 elapsed = time.time() - start_time
-                progress_label.config(text=f"Метод {i+1}/{len(self.methods)}: {method.name}")
+                progress_label.config(text=f"Метод {i+1}/{len(selected_methods)}: {method.name}")
                 time_label.config(text=f"⏱️ Прошло: {int(elapsed)}с")
                 progress_bar['value'] = i
                 self.root.update()
@@ -1611,8 +1596,8 @@ class ExpertMatcher:
                                f"• Первый столбец содержит названия ПО\n"
                                f"• Установлены все библиотеки")
     
-    def run_compare_mode(self):
-        """Режим сравнения ВСЕХ методов
+    def run_compare_mode(self, selected_methods):
+        """Режим сравнения ВЫБРАННЫХ методов
 
         Логика сортировки ИДЕНТИЧНА автоматическому режиму:
         - Приоритет 1: Максимум 100% совпадений
@@ -1630,11 +1615,11 @@ class ExpertMatcher:
             sample_askupo = askupo_df.head(sample_size)
 
             # Динамически рассчитываем примерное время
-            rapidfuzz_count = sum(1 for m in self.methods if m.use_process)
-            other_count = len(self.methods) - rapidfuzz_count
+            rapidfuzz_count = sum(1 for m in selected_methods if m.use_process)
+            other_count = len(selected_methods) - rapidfuzz_count
             estimated_time = (rapidfuzz_count * 3 + other_count * 30) / 60
 
-            info_msg = (f"📊 Будет протестировано ВСЕ {len(self.methods)} методов\n"
+            info_msg = (f"📊 Будет протестировано {len(selected_methods)} выбранных методов\n"
                        f"   • RapidFuzz методов: {rapidfuzz_count} (быстрые)\n"
                        f"   • Других методов: {other_count} (медленнее)\n"
                        f"📦 Sample: {sample_size} записей\n"
@@ -1644,12 +1629,12 @@ class ExpertMatcher:
                 return
 
             progress_win = tk.Toplevel(self.root)
-            progress_win.title("Сравнение ВСЕХ методов...")
+            progress_win.title("Сравнение выбранных методов...")
             progress_win.geometry("500x200")
             progress_win.transient(self.root)
             progress_win.grab_set()
 
-            tk.Label(progress_win, text="📊 Сравнение ВСЕХ методов",
+            tk.Label(progress_win, text="📊 Сравнение выбранных методов",
                     font=("Arial", 12, "bold")).pack(pady=10)
 
             progress_label = tk.Label(progress_win, text="", font=("Arial", 10))
@@ -1657,12 +1642,12 @@ class ExpertMatcher:
 
             progress_bar = ttk.Progressbar(progress_win, length=400, mode='determinate')
             progress_bar.pack(pady=10)
-            progress_bar['maximum'] = len(self.methods)
+            progress_bar['maximum'] = len(selected_methods)
 
             comparison_results = []
 
-            for i, method in enumerate(self.methods):
-                progress_label.config(text=f"Тестирование {i+1}/{len(self.methods)}: {method.name}")
+            for i, method in enumerate(selected_methods):
+                progress_label.config(text=f"Тестирование {i+1}/{len(selected_methods)}: {method.name}")
                 progress_bar['value'] = i
                 self.root.update()
 
@@ -1697,34 +1682,143 @@ class ExpertMatcher:
             self.notebook.select(1)
 
             messagebox.showinfo("✅ Сравнение завершено!",
-                              f"Протестировано ВСЕ {len(self.methods)} методов\n\n"
+                              f"Протестировано {len(selected_methods)} выбранных методов\n\n"
                               f"🏆 Лучший: {comparison_results[0]['method']}\n"
                               f"📊 100% совпадений: {comparison_results[0]['perfect']}")
 
         except Exception as e:
             messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
 
-    def run_full_comparison_mode(self):
-        """Полное сравнение - применяет ВСЕ методы ко ВСЕМ данным"""
+    def _run_comparison_on_full_data(self, methods: List, window_title: str,
+                                     header_text: str, export_filename: str) -> None:
+        """Общий метод для полного сравнения методов на ВСЕХ данных
+
+        Args:
+            methods: Список методов для тестирования
+            window_title: Заголовок окна прогресса
+            header_text: Текст заголовка в окне прогресса
+            export_filename: Имя файла по умолчанию для экспорта
+        """
+        askupo_df = self.read_data_file(self.askupo_file)
+        eatool_df = self.read_data_file(self.eatool_file)
+
+        askupo_col = askupo_df.columns[0]
+        eatool_col = eatool_df.columns[0]
+
+        # Создание окна прогресса
+        progress_win = tk.Toplevel(self.root)
+        progress_win.title(window_title)
+        progress_win.geometry("600x250")
+        progress_win.transient(self.root)
+        progress_win.grab_set()
+
+        tk.Label(progress_win, text=header_text,
+                font=("Arial", 12, "bold")).pack(pady=10)
+
+        method_label = tk.Label(progress_win, text="", font=("Arial", 10))
+        method_label.pack(pady=5)
+
+        progress_label = tk.Label(progress_win, text="", font=("Arial", 9))
+        progress_label.pack(pady=5)
+
+        progress_bar = ttk.Progressbar(progress_win, length=500, mode='determinate')
+        progress_bar.pack(pady=10)
+        progress_bar['maximum'] = len(methods) * len(askupo_df)
+
+        time_label = tk.Label(progress_win, text="", font=("Arial", 9), fg="gray")
+        time_label.pack(pady=5)
+
+        start_time = time.time()
+        all_methods_results = {}  # Словарь: имя метода -> DataFrame с результатами
+        comparison_stats = []
+
+        total_processed = 0
+
+        # Обработка каждого метода
+        for method_idx, method in enumerate(methods):
+            method_start_time = time.time()
+            method_label.config(text=f"Метод {method_idx+1}/{len(methods)}: {method.name}")
+            self.root.update()
+
+            # Применяем метод ко ВСЕМ данным
+            results_df = self.test_method_optimized(method, askupo_df, eatool_df,
+                                                   askupo_col, eatool_col)
+
+            # Сохраняем результаты
+            all_methods_results[method.name] = results_df
+
+            # Подсчитываем статистику
+            stats_dict = self.calculate_statistics(results_df)
+
+            comparison_stats.append({
+                'method': method.name,
+                'library': method.library,
+                'total': stats_dict['total'],
+                'perfect': stats_dict['perfect'],
+                'high': stats_dict['high'],
+                'medium': stats_dict['medium'],
+                'low': stats_dict['low'],
+                'very_low': stats_dict['very_low'],
+                'none': stats_dict['none'],
+                'avg_score': results_df['Процент совпадения'].mean(),
+                'time': time.time() - method_start_time
+            })
+
+            # Обновляем прогресс
+            total_processed += len(askupo_df)
+            progress_bar['value'] = total_processed
+            elapsed = time.time() - start_time
+            remaining = (elapsed / total_processed) * (len(methods) * len(askupo_df) - total_processed)
+
+            progress_label.config(text=f"Обработано методов: {method_idx+1}/{len(methods)}")
+            time_label.config(text=f"⏱️ Прошло: {int(elapsed)}с ({elapsed/60:.1f} мин) | Осталось: ~{int(remaining)}с ({remaining/60:.1f} мин)")
+            self.root.update()
+
+        progress_win.destroy()
+
+        # Сортируем методы по качеству
+        comparison_stats.sort(key=lambda x: (x['perfect'], x['high'], x['avg_score']), reverse=True)
+
+        # Сохраняем для экспорта
+        self.full_comparison_results = {
+            'methods_data': all_methods_results,
+            'comparison_stats': comparison_stats
+        }
+
+        elapsed_total = time.time() - start_time
+
+        # Автоматически экспортируем результаты
+        self.export_full_comparison_to_excel(default_filename=export_filename)
+
+        # Показываем финальное сообщение
+        messagebox.showinfo("✅ Полное сравнение завершено!",
+                          f"⏱️ Время выполнения: {int(elapsed_total)}с ({elapsed_total/60:.1f} мин)\n\n"
+                          f"📊 Протестировано {len(methods)} методов\n"
+                          f"📦 Обработано {len(askupo_df)} записей в каждом методе\n\n"
+                          f"🏆 Лучший метод: {comparison_stats[0]['method']}\n"
+                          f"   • 100% совпадений: {comparison_stats[0]['perfect']}\n"
+                          f"   • 90-99%: {comparison_stats[0]['high']}\n"
+                          f"   • Средний балл: {comparison_stats[0]['avg_score']:.1f}%\n\n"
+                          f"💾 Результаты сохранены в Excel")
+
+    def run_full_comparison_mode(self, selected_methods):
+        """Полное сравнение - применяет ВЫБРАННЫЕ методы ко ВСЕМ данным"""
         try:
+            # Читаем данные для расчета времени
             askupo_df = self.read_data_file(self.askupo_file)
             eatool_df = self.read_data_file(self.eatool_file)
 
-            askupo_col = askupo_df.columns[0]
-            eatool_col = eatool_df.columns[0]
-
             # Динамически рассчитываем примерное время для ВСЕХ данных
-            rapidfuzz_count = sum(1 for m in self.methods if m.use_process)
-            other_count = len(self.methods) - rapidfuzz_count
-            # Для полного датасета: ~3 сек на метод с RapidFuzz, ~4 сек на другие методы
-            # Общее время = количество методов * среднее время на метод
+            rapidfuzz_count = sum(1 for m in selected_methods if m.use_process)
+            other_count = len(selected_methods) - rapidfuzz_count
             estimated_time = (rapidfuzz_count * 3 + other_count * 4) / 60
 
-            info_msg = (f"⚠️ ВНИМАНИЕ: Это ДОЛГАЯ операция!\n\n"
+            # Показываем предупреждение
+            info_msg = (f"⚠️ ВНИМАНИЕ: Это может быть долгая операция!\n\n"
                        f"📂 Будет обработано:\n"
                        f"   АСКУПО: {len(askupo_df)} записей\n"
                        f"   EA Tool: {len(eatool_df)} записей\n"
-                       f"   Методов: {len(self.methods)}\n\n"
+                       f"   Методов: {len(selected_methods)} выбранных\n\n"
                        f"🔬 Каждый метод будет применен ко ВСЕМ записям\n"
                        f"⏱️ Примерное время: {estimated_time:.0f}-{estimated_time*1.5:.0f} минут\n\n"
                        f"📊 Результат: Excel файл с листом для каждого метода + сводка")
@@ -1732,217 +1826,20 @@ class ExpertMatcher:
             if not messagebox.askokcancel("⚠️ Начать полное сравнение?", info_msg):
                 return
 
-            progress_win = tk.Toplevel(self.root)
-            progress_win.title("Полное сравнение ВСЕХ методов...")
-            progress_win.geometry("600x250")
-            progress_win.transient(self.root)
-            progress_win.grab_set()
-
-            tk.Label(progress_win, text="🔬 Полное сравнение ВСЕХ методов на ВСЕХ данных",
-                    font=("Arial", 12, "bold")).pack(pady=10)
-
-            method_label = tk.Label(progress_win, text="", font=("Arial", 10))
-            method_label.pack(pady=5)
-
-            progress_label = tk.Label(progress_win, text="", font=("Arial", 9))
-            progress_label.pack(pady=5)
-
-            progress_bar = ttk.Progressbar(progress_win, length=500, mode='determinate')
-            progress_bar.pack(pady=10)
-            progress_bar['maximum'] = len(self.methods) * len(askupo_df)
-
-            time_label = tk.Label(progress_win, text="", font=("Arial", 9), fg="gray")
-            time_label.pack(pady=5)
-
-            start_time = time.time()
-            all_methods_results = {}  # Словарь: имя метода -> DataFrame с результатами
-            comparison_stats = []
-
-            total_processed = 0
-
-            for method_idx, method in enumerate(self.methods):
-                method_start_time = time.time()
-                method_label.config(text=f"Метод {method_idx+1}/{len(self.methods)}: {method.name}")
-                self.root.update()
-
-                # Применяем метод ко ВСЕМ данным
-                results_df = self.test_method_optimized(method, askupo_df, eatool_df,
-                                                       askupo_col, eatool_col)
-
-                # Сохраняем результаты
-                all_methods_results[method.name] = results_df
-
-                # Подсчитываем статистику
-                stats_dict = self.calculate_statistics(results_df)
-
-                comparison_stats.append({
-                    'method': method.name,
-                    'library': method.library,
-                    'total': stats_dict['total'],
-                    'perfect': stats_dict['perfect'],
-                    'high': stats_dict['high'],
-                    'medium': stats_dict['medium'],
-                    'low': stats_dict['low'],
-                    'very_low': stats_dict['very_low'],
-                    'none': stats_dict['none'],
-                    'avg_score': results_df['Процент'].mean(),
-                    'time': time.time() - method_start_time
-                })
-
-                # Обновляем прогресс
-                total_processed += len(askupo_df)
-                progress_bar['value'] = total_processed
-                elapsed = time.time() - start_time
-                remaining = (elapsed / total_processed) * (len(self.methods) * len(askupo_df) - total_processed)
-
-                progress_label.config(text=f"Обработано методов: {method_idx+1}/{len(self.methods)}")
-                time_label.config(text=f"⏱️ Прошло: {int(elapsed)}с ({elapsed/60:.1f} мин) | Осталось: ~{int(remaining)}с ({remaining/60:.1f} мин)")
-                self.root.update()
-
-            progress_win.destroy()
-
-            # Сортируем методы по качеству
-            comparison_stats.sort(key=lambda x: (x['perfect'], x['high'], x['avg_score']), reverse=True)
-
-            # Сохраняем для экспорта
-            self.full_comparison_results = {
-                'methods_data': all_methods_results,
-                'comparison_stats': comparison_stats
-            }
-
-            elapsed_total = time.time() - start_time
-
-            # Автоматически экспортируем результаты
-            self.export_full_comparison_to_excel()
-
-            messagebox.showinfo("✅ Полное сравнение завершено!",
-                              f"⏱️ Время выполнения: {int(elapsed_total)}с ({elapsed_total/60:.1f} мин)\n\n"
-                              f"📊 Протестировано {len(self.methods)} методов\n"
-                              f"📦 Обработано {len(askupo_df)} записей в каждом методе\n\n"
-                              f"🏆 Лучший метод: {comparison_stats[0]['method']}\n"
-                              f"   • 100% совпадений: {comparison_stats[0]['perfect']}\n"
-                              f"   • 90-99%: {comparison_stats[0]['high']}\n"
-                              f"   • Средний балл: {comparison_stats[0]['avg_score']:.1f}%\n\n"
-                              f"💾 Результаты сохранены в Excel")
+            # Вызываем общий метод для обработки
+            self._run_comparison_on_full_data(
+                methods=selected_methods,
+                window_title="Полное сравнение выбранных методов...",
+                header_text="🔬 Полное сравнение выбранных методов на ВСЕХ данных",
+                export_filename="Полное_сравнение_выбранных_методов.xlsx"
+            )
 
         except Exception as e:
             messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
 
-    def run_manual_mode(self):
-        """Ручной режим - применение одного выбранного метода"""
-        try:
-            selected_methods = self.get_selected_methods()
-            if not selected_methods:
-                messagebox.showerror("Ошибка", "Метод не выбран")
-                return
+    # Методы run_manual_mode и run_multi_manual_mode УДАЛЕНЫ в v2.2
+    # Вся функциональность теперь в run_full_comparison_mode
 
-            method = selected_methods[0]  # Берем первый выбранный метод
-
-            askupo_df = self.read_data_file(self.askupo_file)
-            eatool_df = self.read_data_file(self.eatool_file)
-
-            askupo_col = askupo_df.columns[0]
-            eatool_col = eatool_df.columns[0]
-
-            info_msg = (f"⚙️ Метод: {method.name}\n"
-                       f"📦 Записей Источник 1: {len(askupo_df)}\n"
-                       f"📦 Записей Источник 2: {len(eatool_df)}\n"
-                       f"⏱️ Примерное время: 2-3 минуты")
-
-            if not messagebox.askokcancel("Начать обработку?", info_msg):
-                return
-
-            self.apply_method_optimized(method, askupo_df, eatool_df,
-                                       askupo_col, eatool_col)
-
-        except Exception as e:
-            messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
-
-    def run_multi_manual_mode(self):
-        """Режим выбора нескольких методов - сравнение выбранных методов на sample"""
-        try:
-            selected_methods = self.get_selected_methods()
-            if not selected_methods:
-                messagebox.showerror("Ошибка", "Методы не выбраны")
-                return
-
-            askupo_df = self.read_data_file(self.askupo_file)
-            eatool_df = self.read_data_file(self.eatool_file)
-
-            askupo_col = askupo_df.columns[0]
-            eatool_col = eatool_df.columns[0]
-
-            sample_size = min(200, len(askupo_df))
-            sample_askupo = askupo_df.head(sample_size)
-
-            info_msg = (f"🎯 Будет протестировано {len(selected_methods)} выбранных методов:\n\n"
-                       + "\n".join([f"  • {m.name}" for m in selected_methods[:5]])
-                       + (f"\n  ... и еще {len(selected_methods)-5}" if len(selected_methods) > 5 else "")
-                       + f"\n\n📦 Sample: {sample_size} записей\n"
-                       f"⏱️ Примерное время: {len(selected_methods) * 0.5:.0f}-{len(selected_methods) * 1:.0f} минут")
-
-            if not messagebox.askokcancel("Начать сравнение?", info_msg):
-                return
-
-            progress_win = tk.Toplevel(self.root)
-            progress_win.title("Сравнение выбранных методов...")
-            progress_win.geometry("500x200")
-            progress_win.transient(self.root)
-            progress_win.grab_set()
-
-            tk.Label(progress_win, text="📊 Сравнение выбранных методов",
-                    font=("Arial", 12, "bold")).pack(pady=10)
-
-            progress_label = tk.Label(progress_win, text="", font=("Arial", 10))
-            progress_label.pack(pady=5)
-
-            progress_bar = ttk.Progressbar(progress_win, length=400, mode='determinate')
-            progress_bar.pack(pady=10)
-            progress_bar['maximum'] = len(selected_methods)
-
-            comparison_results = []
-
-            for i, method in enumerate(selected_methods):
-                progress_label.config(text=f"Тестирование {i+1}/{len(selected_methods)}: {method.name}")
-                progress_bar['value'] = i
-                self.root.update()
-
-                start_time = time.time()
-                results = self.test_method_optimized(method, sample_askupo, eatool_df,
-                                                     askupo_col, eatool_col)
-                elapsed = time.time() - start_time
-
-                stats_dict = self.calculate_statistics(results)
-
-                stats = {
-                    'method': method.name,
-                    'library': method.library,
-                    'avg_score': results['Процент совпадения'].mean(),
-                    'perfect': stats_dict['perfect'],
-                    'high': stats_dict['high'],
-                    'medium': stats_dict['medium'],
-                    'time': elapsed
-                }
-
-                comparison_results.append(stats)
-
-            progress_win.destroy()
-
-            # Лексикографическая сортировка
-            comparison_results.sort(key=lambda x: (x['perfect'], x['high'], x['avg_score']),
-                                   reverse=True)
-
-            self.display_comparison(comparison_results)
-            self.notebook.select(1)
-
-            messagebox.showinfo("✅ Сравнение завершено!",
-                              f"Протестировано {len(selected_methods)} методов\n\n"
-                              f"🏆 Лучший: {comparison_results[0]['method']}\n"
-                              f"📊 100% совпадений: {comparison_results[0]['perfect']}")
-
-        except Exception as e:
-            messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
-    
     def evaluate_method_fast(self, method: MatchingMethod, sample_askupo: pd.DataFrame,
                             eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str) -> tuple:
         """Быстрая оценка качества метода
@@ -2416,15 +2313,22 @@ class ExpertMatcher:
         except Exception as e:
             messagebox.showerror("Ошибка", f"❌ Ошибка при экспорте:\n{str(e)}")
 
-    def export_full_comparison_to_excel(self):
-        """Экспорт полного сравнения всех методов в Excel"""
+    def export_full_comparison_to_excel(self, default_filename=None):
+        """Экспорт полного сравнения всех методов в Excel
+
+        Args:
+            default_filename: Имя файла по умолчанию (опционально)
+        """
         if not self.full_comparison_results:
             messagebox.showwarning("Предупреждение", "Нет данных для экспорта")
             return
 
+        if default_filename is None:
+            default_filename = "Полное_сравнение_всех_методов.xlsx"
+
         save_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
-            initialfile="Полное_сравнение_всех_методов.xlsx",
+            initialfile=default_filename,
             filetypes=[("Excel files", "*.xlsx")]
         )
 
