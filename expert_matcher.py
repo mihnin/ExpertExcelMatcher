@@ -32,6 +32,13 @@ from src.constants import AppConstants, NormalizationConstants
 from src.help_content import HelpContent
 from src.models import MatchingMethod, MatchResult, MethodStatistics
 from src.matching_engine import MatchingEngine, NormalizationOptions
+from src.excel_exporter import ExcelExporter
+from src.data_manager import DataManager
+from src.ui_components import (
+    ScrollableFrame, TreeviewWithScrollbar, MethodSelectorListbox,
+    FileSelectorWidget, create_label_frame, create_info_label_frame,
+    create_styled_button, create_title_header
+)
 
 # Импорт библиотек для сопоставления
 try:
@@ -93,17 +100,20 @@ class ExpertMatcher:
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         self.root.minsize(AppConstants.WINDOW_MIN_WIDTH, AppConstants.WINDOW_MIN_HEIGHT)
 
-        self.askupo_file = None
-        self.eatool_file = None
+        # Менеджер данных
+        self.data_manager = DataManager()
+
         self.results = None
         self.methods_comparison = None
         self.full_comparison_results = None  # Для хранения полных результатов всех методов
 
-        # Новые переменные для работы со столбцами
-        self.askupo_columns = []  # Список всех столбцов из источника 1
-        self.eatool_columns = []  # Список всех столбцов из источника 2
-        self.selected_askupo_cols = []  # Выбранные столбцы для сравнения из источника 1
-        self.selected_eatool_cols = []  # Выбранные столбцы для сравнения из источника 2
+        # LEGACY: Алиасы для совместимости (теперь используем data_manager)
+        self.askupo_file = None
+        self.eatool_file = None
+        self.askupo_columns = []
+        self.eatool_columns = []
+        self.selected_askupo_cols = []
+        self.selected_eatool_cols = []
         self.inherit_askupo_cols_var = tk.BooleanVar(value=True)  # Наследовать столбцы из источника 1
         self.inherit_eatool_cols_var = tk.BooleanVar(value=True)  # Наследовать столбцы из источника 2
         self.multi_column_mode_var = tk.BooleanVar(value=False)    # Режим сравнения по нескольким столбцам
@@ -118,6 +128,9 @@ class ExpertMatcher:
 
         # Создаём движок сопоставления
         self.engine = self._create_matching_engine()
+
+        # Создаём экспортер Excel
+        self.exporter = ExcelExporter(self.engine, self.results)
 
         self.methods = self.register_all_methods()
 
@@ -137,6 +150,8 @@ class ExpertMatcher:
     def _update_matching_engine(self):
         """Обновление движка при изменении настроек нормализации"""
         self.engine = self._create_matching_engine()
+        # Обновляем движок в экспортере
+        self.exporter.engine = self.engine
         
     def register_all_methods(self) -> List[MatchingMethod]:
         """Регистрация всех доступных методов сопоставления"""
@@ -235,25 +250,22 @@ class ExpertMatcher:
     # ========================================================================
 
     def _get_column_display_name(self, columns: List[str]) -> str:
-        """Получить отображаемое имя для списка столбцов
-
-        Args:
-            columns: список имен столбцов
-
-        Returns:
-            Строка вида "Col1" или "Col1 + Col2"
-        """
-        return " + ".join(columns) if len(columns) > 1 else columns[0]
+        """Получить отображаемое имя для списка столбцов (делегация к DataManager)"""
+        return self.data_manager.get_column_display_name(columns)
 
     def _get_selected_columns(self):
-        """Получить выбранные столбцы или дефолтные
+        """Получить выбранные столбцы (синхронизация с DataManager)"""
+        # Синхронизируем с data_manager если там пусто, но legacy переменные заполнены
+        if not self.data_manager.selected_source1_cols and self.selected_askupo_cols:
+            self.data_manager.selected_source1_cols = self.selected_askupo_cols
+        if not self.data_manager.selected_source2_cols and self.selected_eatool_cols:
+            self.data_manager.selected_source2_cols = self.selected_eatool_cols
 
-        Returns:
-            Tuple[List[str], List[str]]: (askupo_cols, eatool_cols)
-        """
-        askupo_cols = self.selected_askupo_cols if self.selected_askupo_cols else []
-        eatool_cols = self.selected_eatool_cols if self.selected_eatool_cols else []
-        return askupo_cols, eatool_cols
+        cols1, cols2 = self.data_manager.get_selected_columns()
+        # Обновляем legacy переменные
+        self.selected_askupo_cols = cols1
+        self.selected_eatool_cols = cols2
+        return cols1, cols2
 
     def _create_result_row_dict(self, askupo_combined: str, best_match: str,
                                 best_score: float, method_name: str,
@@ -315,25 +327,14 @@ class ExpertMatcher:
     
     def create_widgets(self):
         """Создание интерфейса"""
-        
-        title_frame = tk.Frame(self.root, bg="#7C3AED", pady=15)
-        title_frame.pack(fill=tk.X)
-        
-        tk.Label(
-            title_frame,
-            text=f"🔬 Expert Excel Matcher v{AppConstants.VERSION}",
-            font=("Arial", 18, "bold"),
-            fg="white",
-            bg="#7C3AED"
-        ).pack()
 
-        tk.Label(
-            title_frame,
-            text=f"⚡ В 100 раз быстрее! • {len(self.methods)} методов • Расширенная нормализация",
-            font=("Arial", 10),
-            fg="white",
-            bg="#7C3AED"
-        ).pack()
+        # Заголовок приложения
+        title_frame = create_title_header(
+            self.root,
+            title=f"🔬 Expert Excel Matcher v{AppConstants.VERSION}",
+            subtitle=f"⚡ В 100 раз быстрее! • {len(self.methods)} методов • Расширенная нормализация"
+        )
+        title_frame.pack(fill=tk.X)
         
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -753,44 +754,25 @@ class ExpertMatcher:
         
         tk.Label(frame, text="📊 Сравнение производительности методов",
                 font=("Arial", 13, "bold")).pack(pady=10)
-        
-        tree_frame = tk.Frame(frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
-        
-        scroll_y = ttk.Scrollbar(tree_frame)
-        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        scroll_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
-        scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        self.comparison_tree = ttk.Treeview(
-            tree_frame,
+
+        # Создаем Treeview для сравнения методов
+        tree_widget = TreeviewWithScrollbar(
+            frame,
             columns=("rank", "method", "library", "perfect", "high", "avg_score", "time"),
-            show="headings",
-            yscrollcommand=scroll_y.set,
-            xscrollcommand=scroll_x.set,
-            height=15
+            headers=[
+                ("rank", "🏆", 50),
+                ("method", "Метод", 300),
+                ("library", "Библиотека", 120),
+                ("perfect", "100%", 80),
+                ("high", "90-99%", 80),
+                ("avg_score", "Средний %", 100),
+                ("time", "Время", 90),
+            ],
+            height=15,
+            horizontal_scroll=True
         )
-        
-        scroll_y.config(command=self.comparison_tree.yview)
-        scroll_x.config(command=self.comparison_tree.xview)
-        
-        headers = [
-            ("rank", "🏆", 50),
-            ("method", "Метод", 300),
-            ("library", "Библиотека", 120),
-            ("perfect", "100%", 80),
-            ("high", "90-99%", 80),
-            ("avg_score", "Средний %", 100),
-            ("time", "Время", 90),
-        ]
-        
-        for col, text, width in headers:
-            self.comparison_tree.heading(col, text=text)
-            self.comparison_tree.column(col, width=width, 
-                                       anchor=tk.CENTER if col != "method" else tk.W)
-        
-        self.comparison_tree.pack(fill=tk.BOTH, expand=True)
+        tree_widget.pack(fill=tk.BOTH, expand=True)
+        self.comparison_tree = tree_widget.tree
         
         btn_frame = tk.Frame(frame)
         btn_frame.pack(fill=tk.X, pady=10)
@@ -832,84 +814,29 @@ class ExpertMatcher:
         
         tk.Label(frame, text="📋 Результаты сопоставления (первые 50 записей):",
                 font=("Arial", 11, "bold")).pack(anchor=tk.W, pady=(10, 5))
-        
-        tree_frame = tk.Frame(frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
-        
-        scroll_y = ttk.Scrollbar(tree_frame)
-        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.results_tree = ttk.Treeview(
-            tree_frame,
+
+        # Создаем Treeview для результатов
+        tree_widget = TreeviewWithScrollbar(
+            frame,
             columns=("num", "askupo", "eatool", "percent"),
-            show="headings",
-            yscrollcommand=scroll_y.set,
+            headers=[
+                ("num", "№", 50),
+                ("askupo", "Источник 1 (сравниваемый столбец)", 350),
+                ("eatool", "Источник 2 (сопоставленный столбец)", 350),
+                ("percent", "Процент совпадения", 120),
+            ],
             height=15
         )
-        scroll_y.config(command=self.results_tree.yview)
-        
-        headers = [
-            ("num", "№", 50),
-            ("askupo", "Источник 1 (сравниваемый столбец)", 350),
-            ("eatool", "Источник 2 (сопоставленный столбец)", 350),
-            ("percent", "Процент совпадения", 120),
-        ]
-        
-        for col, text, width in headers:
-            self.results_tree.heading(col, text=text)
-            self.results_tree.column(col, width=width, 
-                                    anchor=tk.CENTER if col in ["num", "percent"] else tk.W)
-        
-        self.results_tree.pack(fill=tk.BOTH, expand=True)
+        tree_widget.pack(fill=tk.BOTH, expand=True)
+        self.results_tree = tree_widget.tree
         
     def read_data_file(self, filename: str, nrows=None) -> pd.DataFrame:
-        """Универсальное чтение Excel или CSV файла
-
-        Args:
-            filename: Путь к файлу
-            nrows: Количество строк для чтения (None = все)
-
-        Returns:
-            DataFrame с данными
-        """
-        file_ext = Path(filename).suffix.lower()
-
-        if file_ext == '.csv':
-            # Пробуем различные кодировки для CSV
-            encodings = ['utf-8-sig', 'utf-8', 'cp1251', 'windows-1251', 'latin1']
-            for encoding in encodings:
-                try:
-                    df = pd.read_csv(filename, encoding=encoding, nrows=nrows)
-                    return df
-                except (UnicodeDecodeError, Exception):
-                    continue
-            # Если ничего не сработало, пробуем без указания кодировки
-            df = pd.read_csv(filename, nrows=nrows)
-        else:
-            # Excel файлы (.xlsx, .xls)
-            df = pd.read_excel(filename, nrows=nrows)
-
-        return df
+        """Универсальное чтение Excel или CSV файла (делегация к DataManager)"""
+        return self.data_manager.read_data_file(filename, nrows)
 
     def validate_excel_file(self, filename: str) -> Tuple[bool, str]:
-        """Валидация Excel или CSV файла - упрощенная проверка (v2.1)"""
-        try:
-            df = self.read_data_file(filename)
-
-            if df.empty:
-                return False, "Файл пустой (нет данных)"
-
-            if len(df.columns) == 0:
-                return False, "Файл не содержит столбцов"
-
-            if len(df) == 0:
-                return False, "Файл не содержит строк с данными"
-
-            # Успешная валидация - показываем информацию о файле
-            return True, f"✅ Файл валидный\n   Записей: {len(df)}\n   Столбцов: {len(df.columns)}\n   Список столбцов: {', '.join(df.columns[:5])}{' ...' if len(df.columns) > 5 else ''}"
-
-        except Exception as e:
-            return False, f"Ошибка чтения файла:\n{str(e)}"
+        """Валидация Excel или CSV файла (делегация к DataManager)"""
+        return self.data_manager.validate_file(filename)
 
     def select_askupo(self):
         filename = filedialog.askopenfilename(
@@ -917,8 +844,8 @@ class ExpertMatcher:
             filetypes=[("Data files", "*.xlsx *.xls *.csv"), ("Excel files", "*.xlsx *.xls"), ("CSV files", "*.csv"), ("All files", "*.*")]
         )
         if filename:
-            # Валидация файла
-            is_valid, message = self.validate_excel_file(filename)
+            # Используем DataManager для установки файла
+            is_valid, message = self.data_manager.set_source1_file(filename)
 
             if not is_valid:
                 messagebox.showerror("❌ Ошибка валидации Источника данных 1",
@@ -929,13 +856,16 @@ class ExpertMatcher:
                                    f"• Формат: .xlsx, .xls или .csv")
                 return
 
-            self.askupo_file = filename
-            display_name = Path(filename).name
-            if len(display_name) > 50:
-                display_name = display_name[:47] + "..."
+            # Обновляем legacy переменные
+            self.askupo_file = self.data_manager.source1_file
+            self.askupo_columns = self.data_manager.source1_columns
+            self.selected_askupo_cols = self.data_manager.selected_source1_cols
+
+            # Обновляем GUI
+            display_name = self.data_manager.get_short_filename(filename)
             self.askupo_label.config(text=f"✅ {display_name}", fg="green", font=("Arial", 9, "bold"))
 
-            # Загрузка столбцов из файла
+            # Загрузка столбцов в GUI
             self.load_askupo_columns()
             self.check_ready()
     
@@ -945,8 +875,8 @@ class ExpertMatcher:
             filetypes=[("Data files", "*.xlsx *.xls *.csv"), ("Excel files", "*.xlsx *.xls"), ("CSV files", "*.csv"), ("All files", "*.*")]
         )
         if filename:
-            # Валидация файла
-            is_valid, message = self.validate_excel_file(filename)
+            # Используем DataManager для установки файла
+            is_valid, message = self.data_manager.set_source2_file(filename)
 
             if not is_valid:
                 messagebox.showerror("❌ Ошибка валидации Источника данных 2",
@@ -957,18 +887,22 @@ class ExpertMatcher:
                                    f"• Формат: .xlsx, .xls или .csv")
                 return
 
-            self.eatool_file = filename
-            display_name = Path(filename).name
-            if len(display_name) > 50:
-                display_name = display_name[:47] + "..."
+            # Обновляем legacy переменные
+            self.eatool_file = self.data_manager.source2_file
+            self.eatool_columns = self.data_manager.source2_columns
+            self.selected_eatool_cols = self.data_manager.selected_source2_cols
+
+            # Обновляем GUI
+            display_name = self.data_manager.get_short_filename(filename)
             self.eatool_label.config(text=f"✅ {display_name}", fg="green", font=("Arial", 9, "bold"))
 
-            # Загрузка столбцов из файла
+            # Загрузка столбцов в GUI
             self.load_eatool_columns()
             self.check_ready()
-    
+
     def check_ready(self):
-        if self.askupo_file and self.eatool_file:
+        """Проверка готовности к обработке (делегация к DataManager)"""
+        if self.data_manager.is_ready():
             self.process_btn.config(state=tk.NORMAL)
 
     def load_askupo_columns(self):
@@ -1771,348 +1705,58 @@ class ExpertMatcher:
     
     def export_comparison(self):
         """Экспорт сравнения методов"""
-        if not self.methods_comparison:
-            messagebox.showwarning("Предупреждение", "Нет данных для экспорта")
-            return
-        
-        save_path = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            initialfile="Сравнение_методов_сопоставления.xlsx",
-            filetypes=[("Excel files", "*.xlsx")]
-        )
-        
-        if not save_path:
-            return
-        
-        df = pd.DataFrame([
-            {
-                'Место': i + 1,
-                'Метод': stats['method'],
-                'Библиотека': stats['library'],
-                '100% (точное)': stats['perfect'],
-                '90-99% (высокое)': stats['high'],
-                '70-89% (среднее)': stats['medium'],
-                'Средний %': round(stats['avg_score'], 1),
-                'Время (сек)': round(stats['time'], 2)
-            }
-            for i, stats in enumerate(self.methods_comparison)
-        ])
-        
-        try:
-            with pd.ExcelWriter(save_path, engine='xlsxwriter') as writer:
-                df.to_excel(writer, sheet_name='Сравнение методов', index=False)
-                
-                workbook = writer.book
-                worksheet = writer.sheets['Сравнение методов']
-                
-                header_format = workbook.add_format({
-                    'bold': True,
-                    'bg_color': '#7C3AED',
-                    'font_color': 'white',
-                    'align': 'center',
-                    'valign': 'vcenter',
-                    'border': 1
-                })
-                
-                for col_num, value in enumerate(df.columns.values):
-                    worksheet.write(0, col_num, value, header_format)
-                
-                worksheet.set_column('A:A', 10)
-                worksheet.set_column('B:B', 40)
-                worksheet.set_column('C:H', 18)
-            
-            messagebox.showinfo("Успех", f"✅ Файл сохранен:\n{save_path}")
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка экспорта:\n{str(e)}")
+        self.exporter.export_comparison(self.methods_comparison)
     
     def export_full(self):
+        """Экспорт полного отчета со статистикой"""
         if self.results is None:
             messagebox.showwarning("Предупреждение", "Нет данных для экспорта")
             return
-        self.export_excel(self.results, "Полный_отчет_сопоставления.xlsx", include_stats=True)
-    
+        # Обновляем results в exporter перед экспортом
+        self.exporter.results = self.results
+        self.exporter.export_results(self.results, "Полный_отчет_сопоставления.xlsx", include_stats=True)
+
     def export_perfect(self):
+        """Экспорт только 100% совпадений"""
         if self.results is None:
             return
-        data = self.results[self.results['Процент совпадения'] == 100]
-        self.export_excel(data, "Точные_совпадения_100%.xlsx")
-    
+        data = self.results[self.results[AppConstants.COL_PERCENT] == 100]
+        self.exporter.results = self.results
+        self.exporter.export_results(data, "Точные_совпадения_100%.xlsx")
+
     def export_problems(self):
+        """Экспорт проблемных совпадений (<90%)"""
         if self.results is None:
             return
-        data = self.results[self.results['Процент совпадения'] < 90]
-        self.export_excel(data, "Требуют_проверки_менее_90%.xlsx")
-    
+        data = self.results[self.results[AppConstants.COL_PERCENT] < 90]
+        self.exporter.results = self.results
+        self.exporter.export_results(data, "Требуют_проверки_менее_90%.xlsx")
+
     def export_no_match(self):
+        """Экспорт несовпадений (0%)"""
         if self.results is None:
             return
-        data = self.results[self.results['Процент совпадения'] == 0]
-        self.export_excel(data, "Без_совпадений_0%.xlsx")
+        data = self.results[self.results[AppConstants.COL_PERCENT] == 0]
+        self.exporter.results = self.results
+        self.exporter.export_results(data, "Без_совпадений_0%.xlsx")
     
     def export_excel(self, data: pd.DataFrame, filename: str, include_stats: bool = False):
-        """Экспорт в Excel"""
-        save_path = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            initialfile=filename,
-            filetypes=[("Excel files", "*.xlsx")]
-        )
-        
-        if not save_path:
-            return
-        
-        try:
-            data_to_export = data.copy()
-
-            # Заменяем NaN и inf на пустые строки для корректного экспорта
-            data_to_export = data_to_export.replace([np.nan, np.inf, -np.inf], "")
-
-            data_to_export.insert(0, '№', range(1, len(data_to_export) + 1))
-
-            with pd.ExcelWriter(save_path, engine='xlsxwriter',
-                              engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:
-                data_to_export.to_excel(writer, sheet_name='Результаты', index=False)
-                
-                workbook = writer.book
-                worksheet = writer.sheets['Результаты']
-                
-                header_format = workbook.add_format({
-                    'bold': True,
-                    'bg_color': '#7C3AED',
-                    'font_color': 'white',
-                    'align': 'center',
-                    'valign': 'vcenter',
-                    'border': 1
-                })
-                
-                for col_num, value in enumerate(data_to_export.columns.values):
-                    worksheet.write(0, col_num, value, header_format)
-
-                # Динамическая ширина столбцов
-                worksheet.set_column('A:A', 8)  # Номер строки
-                # Столбцы B и далее - автоматическая ширина в зависимости от количества
-                for col_num in range(1, len(data_to_export.columns)):
-                    col_name = data_to_export.columns[col_num]
-                    if 'Источник данных' in str(col_name):
-                        worksheet.set_column(col_num, col_num, 45)  # Широкие столбцы для названий
-                    elif col_name == 'Процент совпадения':
-                        worksheet.set_column(col_num, col_num, 12)  # Узкий для процента
-                    elif col_name == 'Метод':
-                        worksheet.set_column(col_num, col_num, 35)  # Средний для метода
-                    else:
-                        worksheet.set_column(col_num, col_num, 20)  # Остальные столбцы из Источника 2
-                
-                formats = {
-                    100: workbook.add_format({'bg_color': '#D1FAE5', 'border': 1}),
-                    90: workbook.add_format({'bg_color': '#DBEAFE', 'border': 1}),
-                    70: workbook.add_format({'bg_color': '#FEF3C7', 'border': 1}),
-                    50: workbook.add_format({'bg_color': '#FED7AA', 'border': 1}),
-                    1: workbook.add_format({'bg_color': '#FFE4E1', 'border': 1}),
-                    0: workbook.add_format({'bg_color': '#FEE2E2', 'border': 1})
-                }
-                
-                for row_num in range(1, len(data_to_export) + 1):
-                    percent = data_to_export.iloc[row_num - 1]['Процент совпадения']
-                    
-                    if percent == 100:
-                        fmt = formats[100]
-                    elif percent >= 90:
-                        fmt = formats[90]
-                    elif percent >= 70:
-                        fmt = formats[70]
-                    elif percent >= 50:
-                        fmt = formats[50]
-                    elif percent > 0:
-                        fmt = formats[1]
-                    else:
-                        fmt = formats[0]
-                    
-                    for col_num in range(len(data_to_export.columns)):
-                        worksheet.write(row_num, col_num, 
-                                      data_to_export.iloc[row_num - 1, col_num], fmt)
-                
-                if include_stats and self.results is not None:
-                    # Используем ИСПРАВЛЕННУЮ функцию статистики
-                    stats = self.engine.calculate_statistics(self.results)
-                    
-                    stats_data = pd.DataFrame([
-                        {'Категория': 'Всего записей', 'Количество': stats['total'], 'Процент': '100%'},
-                        {'Категория': '100% (точное совпадение)', 'Количество': stats['perfect'], 'Процент': f"{stats['perfect']/stats['total']*100:.1f}%"},
-                        {'Категория': '90-99% (высокое совпадение)', 'Количество': stats['high'], 'Процент': f"{stats['high']/stats['total']*100:.1f}%"},
-                        {'Категория': '70-89% (среднее совпадение)', 'Количество': stats['medium'], 'Процент': f"{stats['medium']/stats['total']*100:.1f}%"},
-                        {'Категория': '50-69% (низкое совпадение)', 'Количество': stats['low'], 'Процент': f"{stats['low']/stats['total']*100:.1f}%"},
-                        {'Категория': '1-49% (очень низкое совпадение)', 'Количество': stats['very_low'], 'Процент': f"{stats['very_low']/stats['total']*100:.1f}%"},
-                        {'Категория': '0% (нет совпадения)', 'Количество': stats['none'], 'Процент': f"{stats['none']/stats['total']*100:.1f}%"},
-                        {'Категория': '---', 'Количество': '---', 'Процент': '---'},
-                        {'Категория': 'Проверка суммы', 'Количество': stats['check_sum'], 'Процент': '✅' if stats['check_sum'] == stats['total'] else '❌ ОШИБКА!'}
-                    ])
-                    stats_data.to_excel(writer, sheet_name='Статистика', index=False)
-            
-            messagebox.showinfo("Успех", f"✅ Файл сохранен:\n{save_path}")
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"❌ Ошибка при экспорте:\n{str(e)}")
+        """
+        Базовая функция экспорта в Excel (LEGACY - используется для обратной совместимости)
+        Рекомендуется использовать self.exporter.export_results() напрямую
+        """
+        self.exporter.results = self.results
+        return self.exporter.export_results(data, filename, include_stats)
 
     def export_full_comparison_to_excel(self, default_filename=None):
-        """Экспорт полного сравнения всех методов в Excel
+        """
+        Экспорт полного сравнения всех методов в Excel
 
         Args:
             default_filename: Имя файла по умолчанию (опционально)
         """
-        if not self.full_comparison_results:
-            messagebox.showwarning("Предупреждение", "Нет данных для экспорта")
-            return
-
-        if default_filename is None:
-            default_filename = "Полное_сравнение_всех_методов.xlsx"
-
-        save_path = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            initialfile=default_filename,
-            filetypes=[("Excel files", "*.xlsx")]
-        )
-
-        if not save_path:
-            return
-
-        try:
-            methods_data = self.full_comparison_results['methods_data']
-            comparison_stats = self.full_comparison_results['comparison_stats']
-
-            # Очищаем все DataFrame от NaN и inf
-            cleaned_methods_data = {}
-            for method_name, df in methods_data.items():
-                cleaned_df = df.copy()
-                cleaned_df = cleaned_df.replace([np.nan, np.inf, -np.inf], "")
-                cleaned_methods_data[method_name] = cleaned_df
-
-            with pd.ExcelWriter(save_path, engine='xlsxwriter',
-                              engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:
-                workbook = writer.book
-
-                # Форматы
-                header_format = workbook.add_format({
-                    'bold': True,
-                    'bg_color': '#7C3AED',
-                    'font_color': 'white',
-                    'align': 'center',
-                    'valign': 'vcenter',
-                    'border': 1
-                })
-
-                formats = {
-                    100: workbook.add_format({'bg_color': '#D1FAE5', 'border': 1}),
-                    90: workbook.add_format({'bg_color': '#DBEAFE', 'border': 1}),
-                    70: workbook.add_format({'bg_color': '#FEF3C7', 'border': 1}),
-                    50: workbook.add_format({'bg_color': '#FED7AA', 'border': 1}),
-                    1: workbook.add_format({'bg_color': '#FFE4E1', 'border': 1}),
-                    0: workbook.add_format({'bg_color': '#FEE2E2', 'border': 1})
-                }
-
-                # 1. Лист "Сводка" - сравнительная таблица всех методов
-                summary_df = pd.DataFrame([
-                    {
-                        '🏆 Место': i + 1,
-                        'Метод': stats['method'],
-                        'Библиотека': stats['library'],
-                        'Всего записей': stats['total'],
-                        '100% (точное)': stats['perfect'],
-                        '90-99% (высокое)': stats['high'],
-                        '70-89% (среднее)': stats['medium'],
-                        '50-69% (низкое)': stats['low'],
-                        '1-49% (очень низкое)': stats['very_low'],
-                        '0% (нет)': stats['none'],
-                        'Средний %': round(stats['avg_score'], 1),
-                        'Время (сек)': round(stats['time'], 2)
-                    }
-                    for i, stats in enumerate(comparison_stats)
-                ])
-
-                summary_df.to_excel(writer, sheet_name='📊 Сводка', index=False)
-                worksheet = writer.sheets['📊 Сводка']
-
-                for col_num, value in enumerate(summary_df.columns.values):
-                    worksheet.write(0, col_num, value, header_format)
-
-                worksheet.set_column('A:A', 10)
-                worksheet.set_column('B:B', 40)
-                worksheet.set_column('C:L', 15)
-
-                # 2. Листы для каждого метода
-                for method_name, results_df in cleaned_methods_data.items():
-                    # Удаляем эмодзи и недопустимые символы сначала
-                    sheet_name = method_name
-
-                    # Удаляем эмодзи (могут вызывать проблемы в Excel)
-                    sheet_name = ''.join(char for char in sheet_name if ord(char) < 128)
-
-                    # Удаляем недопустимые символы для названия листа Excel
-                    invalid_chars = [':', '\\', '/', '?', '*', '[', ']']
-                    for char in invalid_chars:
-                        sheet_name = sheet_name.replace(char, '_')
-
-                    # Убираем лишние пробелы
-                    sheet_name = sheet_name.strip()
-
-                    # Ограничиваем длину названия листа (Excel лимит 31 символ)
-                    if len(sheet_name) > 31:
-                        sheet_name = sheet_name[:28] + "..."
-
-                    # Если название пустое после очистки, используем номер
-                    if not sheet_name:
-                        sheet_name = f"Method_{list(cleaned_methods_data.keys()).index(method_name) + 1}"
-
-                    # Добавляем номер строки
-                    export_df = results_df.copy()
-                    export_df.insert(0, '№', range(1, len(export_df) + 1))
-
-                    export_df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    worksheet = writer.sheets[sheet_name]
-
-                    # Заголовки
-                    for col_num, value in enumerate(export_df.columns.values):
-                        worksheet.write(0, col_num, value, header_format)
-
-                    # Динамическая ширина столбцов
-                    worksheet.set_column('A:A', 8)  # Номер строки
-                    for col_num in range(1, len(export_df.columns)):
-                        col_name = export_df.columns[col_num]
-                        if 'Источник данных' in str(col_name):
-                            worksheet.set_column(col_num, col_num, 45)  # Широкие столбцы для названий
-                        elif col_name == 'Процент совпадения':
-                            worksheet.set_column(col_num, col_num, 12)  # Узкий для процента
-                        elif col_name == 'Метод':
-                            worksheet.set_column(col_num, col_num, 35)  # Средний для метода
-                        else:
-                            worksheet.set_column(col_num, col_num, 20)  # Остальные столбцы из Источника 2
-
-                    # Цветовая раскраска по проценту совпадения
-                    for row_num in range(1, len(export_df) + 1):
-                        percent = export_df.iloc[row_num - 1]['Процент совпадения']
-
-                        if percent == 100:
-                            fmt = formats[100]
-                        elif percent >= 90:
-                            fmt = formats[90]
-                        elif percent >= 70:
-                            fmt = formats[70]
-                        elif percent >= 50:
-                            fmt = formats[50]
-                        elif percent > 0:
-                            fmt = formats[1]
-                        else:
-                            fmt = formats[0]
-
-                        for col_num in range(len(export_df.columns)):
-                            worksheet.write(row_num, col_num,
-                                          export_df.iloc[row_num - 1, col_num], fmt)
-
-            messagebox.showinfo("Успех", f"✅ Полное сравнение сохранено!\n\n"
-                              f"📁 Файл: {Path(save_path).name}\n"
-                              f"📊 Листов: {len(cleaned_methods_data) + 1}\n"
-                              f"   • Сводка: 1 лист\n"
-                              f"   • Результаты методов: {len(cleaned_methods_data)} листов")
-
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"❌ Ошибка при экспорте:\n{str(e)}")
+        filename = default_filename or "Полное_сравнение_всех_методов.xlsx"
+        return self.exporter.export_full_comparison(self.full_comparison_results, filename)
 
 
 def main():
