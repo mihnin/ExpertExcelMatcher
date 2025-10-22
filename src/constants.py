@@ -12,7 +12,7 @@ class AppConstants:
 
     # Версия
     VERSION = "3.0.0"
-    APP_TITLE = f"🔬 Expert Excel Matcher v{VERSION}"
+    APP_TITLE = f"🔬 Expert Excel Matcher v{VERSION} от ДИТ (УПФЭ) "
 
     # Названия столбцов в результатах
     COL_SOURCE1_PREFIX = "Источник 1:"

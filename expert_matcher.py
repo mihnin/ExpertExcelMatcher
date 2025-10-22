@@ -162,13 +162,13 @@ class ExpertMatcher:
         
         if RAPIDFUZZ_AVAILABLE:
             methods.extend([
-                MatchingMethod("🥇 RapidFuzz: WRatio (рекомендуется)",
+                MatchingMethod("RapidFuzz: WRatio",
                              fuzz.WRatio, "rapidfuzz",
                              use_process=True, scorer=fuzz.WRatio),
-                MatchingMethod("🥈 RapidFuzz: Token Set",
+                MatchingMethod("RapidFuzz: Token Set",
                              fuzz.token_set_ratio, "rapidfuzz",
                              use_process=True, scorer=fuzz.token_set_ratio),
-                MatchingMethod("🥉 RapidFuzz: Token Sort",
+                MatchingMethod("RapidFuzz: Token Sort",
                              fuzz.token_sort_ratio, "rapidfuzz",
                              use_process=True, scorer=fuzz.token_sort_ratio),
                 MatchingMethod("RapidFuzz: Partial Ratio",
