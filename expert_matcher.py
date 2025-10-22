@@ -218,7 +218,7 @@ class ExpertMatcher:
 
         # Всегда добавляем метод точного совпадения (ВПР)
         methods.append(
-            MatchingMethod("📊 Exact Match (ВПР)",
+            MatchingMethod("Exact Match (ВПР)",
                          self.exact_match_func, "builtin",
                          use_process=False, scorer=None)
         )

@@ -190,7 +190,7 @@ class ExcelExporter:
              'Процент': f"{stats['none']/stats['total']*100:.1f}%"},
             {'Категория': '---', 'Количество': '---', 'Процент': '---'},
             {'Категория': 'Проверка суммы', 'Количество': stats['check_sum'],
-             'Процент': '✅' if stats['check_sum'] == stats['total'] else '❌ ОШИБКА!'}
+             'Процент': 'OK' if stats['check_sum'] == stats['total'] else 'ОШИБКА!'}
         ])
 
         stats_data.to_excel(writer, sheet_name='Статистика', index=False)
@@ -359,7 +359,7 @@ class ExcelExporter:
                 # 1. ЛИСТ "Сводка" - сравнительная таблица всех методов
                 summary_df = pd.DataFrame([
                     {
-                        '🏆 Место': i + 1,
+                        'Место': i + 1,
                         'Метод': stats['method'],
                         'Библиотека': stats['library'],
                         'Всего записей': stats['total'],
@@ -375,8 +375,8 @@ class ExcelExporter:
                     for i, stats in enumerate(comparison_stats)
                 ])
 
-                summary_df.to_excel(writer, sheet_name='📊 Сводка', index=False)
-                worksheet = writer.sheets['📊 Сводка']
+                summary_df.to_excel(writer, sheet_name='Сводка', index=False)
+                worksheet = writer.sheets['Сводка']
 
                 self._apply_header_format(worksheet, summary_df.columns.values, header_format)
 
