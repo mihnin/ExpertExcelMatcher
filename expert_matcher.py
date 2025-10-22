@@ -919,7 +919,13 @@ class ExpertMatcher:
             self.run_manual_mode()
     
     def run_auto_mode(self):
-        """Автоматический режим - выбор лучшего метода из ВСЕХ доступных"""
+        """Автоматический режим - выбор лучшего метода из ВСЕХ доступных
+
+        Логика выбора ИДЕНТИЧНА режиму сравнения:
+        - Приоритет 1: Максимум 100% совпадений
+        - Приоритет 2: Максимум 90-99% совпадений
+        - Приоритет 3: Максимальный средний процент
+        """
         try:
             askupo_df = pd.read_excel(self.askupo_file)
             eatool_df = pd.read_excel(self.eatool_file)
@@ -948,7 +954,7 @@ class ExpertMatcher:
             sample_askupo = askupo_df.head(sample_size)
 
             best_method = None
-            best_score = -1
+            best_score = (-1, -1, -1)  # Кортеж для лексикографического сравнения
 
             progress_win = tk.Toplevel(self.root)
             progress_win.title("Тестирование ВСЕХ методов...")
@@ -988,8 +994,11 @@ class ExpertMatcher:
             progress_win.destroy()
 
             messagebox.showinfo("✅ Лучший метод найден!",
-                              f"🏆 Выбран метод: {best_method.name}\n"
-                              f"📊 Оценка качества: {best_score:.1f}/100\n\n"
+                              f"🏆 Выбран метод: {best_method.name}\n\n"
+                              f"📊 Статистика на sample данных:\n"
+                              f"   • 100% совпадений: {best_score[0]}\n"
+                              f"   • 90-99% совпадений: {best_score[1]}\n"
+                              f"   • Средний процент: {best_score[2]:.1f}%\n\n"
                               f"⏱️ Применение ко всем данным займет ~2-3 минуты")
 
             self.apply_method_optimized(best_method, askupo_df, eatool_df,
@@ -1003,7 +1012,13 @@ class ExpertMatcher:
                                f"• Установлены все библиотеки")
     
     def run_compare_mode(self):
-        """Режим сравнения ВСЕХ методов"""
+        """Режим сравнения ВСЕХ методов
+
+        Логика сортировки ИДЕНТИЧНА автоматическому режиму:
+        - Приоритет 1: Максимум 100% совпадений
+        - Приоритет 2: Максимум 90-99% совпадений
+        - Приоритет 3: Максимальный средний процент
+        """
         try:
             askupo_df = pd.read_excel(self.askupo_file)
             eatool_df = pd.read_excel(self.eatool_file)
@@ -1073,6 +1088,8 @@ class ExpertMatcher:
 
             progress_win.destroy()
 
+            # Лексикографическая сортировка (идентична автоматическому режиму)
+            # Приоритет: 100% совпадений > 90-99% совпадений > средний процент
             comparison_results.sort(key=lambda x: (x['perfect'], x['high'], x['avg_score']),
                                    reverse=True)
 
@@ -1241,17 +1258,23 @@ class ExpertMatcher:
         except Exception as e:
             messagebox.showerror("❌ Ошибка", f"Ошибка обработки:\n{str(e)}")
     
-    def evaluate_method_fast(self, method: MatchingMethod, sample_askupo: pd.DataFrame, 
-                            eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str) -> float:
-        """Быстрая оценка качества метода"""
-        results = self.test_method_optimized(method, sample_askupo, eatool_df, 
+    def evaluate_method_fast(self, method: MatchingMethod, sample_askupo: pd.DataFrame,
+                            eatool_df: pd.DataFrame, askupo_col: str, eatool_col: str) -> tuple:
+        """Быстрая оценка качества метода
+
+        Возвращает кортеж для лексикографического сравнения:
+        (количество 100%, количество 90-99%, средний процент)
+        Это обеспечивает единообразие с режимом сравнения методов.
+        """
+        results = self.test_method_optimized(method, sample_askupo, eatool_df,
                                             askupo_col, eatool_col)
-        
+
         stats = self.calculate_statistics(results)
-        
-        # Взвешенная оценка
-        score = (stats['perfect'] * 3 + stats['high'] * 2 + results['Процент'].mean()) / 6
-        
+
+        # Лексикографическая оценка (приоритет: 100% > 90-99% > средний)
+        # Идентична логике сортировки в режиме сравнения
+        score = (stats['perfect'], stats['high'], results['Процент'].mean())
+
         return score
     
     def test_method_optimized(self, method: MatchingMethod, askupo_df: pd.DataFrame,

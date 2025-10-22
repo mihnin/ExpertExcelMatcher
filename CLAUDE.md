@@ -56,10 +56,11 @@ python check_report.py
 2. **ExpertMatcher Class** (lines 141-1621)
    - Main application controller managing the GUI and processing logic
    - Four operational modes:
-     - **Auto mode**: Tests ALL available methods on a sample and selects the best (dynamic time estimation)
-     - **Compare mode**: Tests ALL methods on sample data and displays comparison metrics
+     - **Auto mode**: Tests ALL available methods on a sample and selects the best using lexicographic ranking (100% > 90-99% > avg)
+     - **Compare mode**: Tests ALL methods on sample data, displays comparison metrics, uses SAME ranking logic as Auto
      - **Full Compare mode**: Applies ALL methods to ALL data and exports comprehensive Excel report (30-60 min)
      - **Manual mode**: Uses a user-selected specific method
+   - **Note**: Auto and Compare modes use IDENTICAL selection logic, ensuring Auto always picks the #1 method from Compare
 
 3. **Matching Libraries Integration**
    - **RapidFuzz** (RAPIDFUZZ_AVAILABLE): Primary library, fastest performance
@@ -146,11 +147,16 @@ python check_report.py
    - Score normalization: converts [0,1] range to [0,100] percentage
    - Try-catch blocks protect against malformed data in matching loops
 
-5. **Method Selection Strategy**
-   - Auto mode uses weighted scoring: `(perfect*3 + high*2 + avg_score)/6`
-   - Prioritizes exact matches (100%) and high-confidence matches (90-99%)
+5. **Method Selection Strategy (UNIFIED LOGIC)**
+   - **Both Auto and Compare modes use IDENTICAL lexicographic sorting:**
+     - Priority 1: Maximum 100% matches (perfect)
+     - Priority 2: Maximum 90-99% matches (high)
+     - Priority 3: Maximum average score
+   - This ensures consistency: Auto mode always selects the same "best" method shown as #1 in Compare mode
    - **ALL methods are tested** (no filtering by speed anymore)
    - Users can see full comparison and choose based on accuracy, not just speed
+   - Scoring tuple: `(perfect_count, high_count, avg_score)` - compared lexicographically
+   - Example: Method with (50, 30, 85%) beats (48, 40, 90%) because 50 > 48 in first position
 
 ## File Expectations
 
