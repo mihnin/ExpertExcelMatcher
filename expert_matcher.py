@@ -291,17 +291,31 @@ class ExpertMatcher:
         """
         askupo_cols, eatool_cols = self._get_selected_columns()
 
-        # Формируем названия столбцов
-        askupo_col_name = self._get_column_display_name(askupo_cols)
-        eatool_col_name = self._get_column_display_name(eatool_cols)
+        # Базовые поля - начинаем с процента и метода
+        result_row = {}
 
-        # Базовые поля
-        result_row = {
-            f'{AppConstants.COL_SOURCE1_PREFIX} {askupo_col_name}': askupo_combined,
-            f'{AppConstants.COL_SOURCE2_PREFIX} {eatool_col_name}': best_match,
-            AppConstants.COL_PERCENT: round(best_score, 1),
-            AppConstants.COL_METHOD: method_name
-        }
+        # Добавляем КАЖДЫЙ выбранный столбец источника 1 ОТДЕЛЬНО
+        for col in askupo_cols:
+            result_row[f'{AppConstants.COL_SOURCE1_PREFIX} {col}'] = askupo_row[col]
+
+        # Добавляем КАЖДЫЙ выбранный столбец источника 2 ОТДЕЛЬНО
+        if best_match:
+            matched_row = eatool_row_dict.get(best_match)
+            if matched_row is not None:
+                for col in eatool_cols:
+                    result_row[f'{AppConstants.COL_SOURCE2_PREFIX} {col}'] = matched_row[col]
+            else:
+                # Если совпадение не найдено, заполняем пустыми значениями
+                for col in eatool_cols:
+                    result_row[f'{AppConstants.COL_SOURCE2_PREFIX} {col}'] = ""
+        else:
+            # Нет совпадения - пустые значения
+            for col in eatool_cols:
+                result_row[f'{AppConstants.COL_SOURCE2_PREFIX} {col}'] = ""
+
+        # Добавляем процент и метод в конец
+        result_row[AppConstants.COL_PERCENT] = round(best_score, 1)
+        result_row[AppConstants.COL_METHOD] = method_name
 
         # Наследование столбцов из источника 1
         if self.inherit_askupo_cols_var.get():
@@ -450,33 +464,8 @@ class ExpertMatcher:
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось загрузить столбцы из источника 2:\n{str(e)}")
 
-    def on_askupo_column_select(self, event):
-        """Обработчик выбора столбцов из источника 1"""
-        selected_indices = self.askupo_col_listbox.curselection()
-        self.selected_askupo_cols = [self.askupo_columns[i] for i in selected_indices]
-
-        # Ограничение: максимум 2 столбца
-        if len(selected_indices) > 2:
-            messagebox.showwarning("Предупреждение",
-                                 "Можно выбрать максимум 2 столбца.\n"
-                                 "Последний выбор будет отменен.")
-            # Отменяем последний выбор
-            self.askupo_col_listbox.selection_clear(selected_indices[-1])
-            self.selected_askupo_cols = self.selected_askupo_cols[:-1]
-
-    def on_eatool_column_select(self, event):
-        """Обработчик выбора столбцов из источника 2"""
-        selected_indices = self.eatool_col_listbox.curselection()
-        self.selected_eatool_cols = [self.eatool_columns[i] for i in selected_indices]
-
-        # Ограничение: максимум 2 столбца
-        if len(selected_indices) > 2:
-            messagebox.showwarning("Предупреждение",
-                                 "Можно выбрать максимум 2 столбца.\n"
-                                 "Последний выбор будет отменен.")
-            # Отменяем последний выбор
-            self.eatool_col_listbox.selection_clear(selected_indices[-1])
-            self.selected_eatool_cols = self.selected_eatool_cols[:-1]
+    # УДАЛЕНЫ ДУБЛИРОВАННЫЕ ОБРАБОТЧИКИ on_askupo_column_select и on_eatool_column_select
+    # Они уже реализованы в UIManager (src/ui_manager.py строки 534-560)
 
     def select_all_methods(self):
         """Выбрать все методы в списке"""
@@ -515,6 +504,10 @@ class ExpertMatcher:
 
     def start_processing(self):
         """Начать обработку"""
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Обновляем движок нормализации перед каждой обработкой!
+        # Без этого галки нормализации не работают!
+        self._update_matching_engine()
+
         # Валидация выбранных столбцов
         if not self.selected_askupo_cols:
             messagebox.showerror("Ошибка",
@@ -1156,17 +1149,21 @@ class ExpertMatcher:
     
     def display_results(self, method: MatchingMethod):
         """Отображение результатов"""
-        
+
         for widget in self.result_info_frame.winfo_children():
             widget.destroy()
-        
-        info_text = f"🔬 Использован метод: {method.name} (библиотека: {method.library})"
-        tk.Label(self.result_info_frame, text=info_text, 
-                font=("Arial", 11, "bold"), fg="#7C3AED").pack(anchor=tk.W)
-        
+
+        # УЛУЧШЕНО: Показываем какие столбцы использовались
+        cols1_display = " + ".join(self.selected_askupo_cols)
+        cols2_display = " + ".join(self.selected_eatool_cols)
+        info_text = f"🔬 Использован метод: {method.name} (библиотека: {method.library})\n"
+        info_text += f"📊 Сравнение: [{cols1_display}] ⟷ [{cols2_display}]"
+        tk.Label(self.result_info_frame, text=info_text,
+                font=("Arial", 10, "bold"), fg="#7C3AED", justify=tk.LEFT).pack(anchor=tk.W)
+
         for widget in self.result_stats_frame.winfo_children():
             widget.destroy()
-        
+
         # Используем ИСПРАВЛЕННУЮ функцию статистики
         stats = self.engine.calculate_statistics(self.results)
         
@@ -1195,18 +1192,22 @@ class ExpertMatcher:
             self.results_tree.delete(item)
         
         for idx, row in self.results.head(50).iterrows():
-            # Названия столбцов теперь динамические, используем первый и второй столбец
-            col_names = self.results.columns.tolist()
-            source1_col = [c for c in col_names if c.startswith('Источник 1:')][0]
-            source2_col = [c for c in col_names if c.startswith('Источник 2:')][0]
+            # ИСПРАВЛЕНО: Показываем ТОЛЬКО выбранные для СРАВНЕНИЯ столбцы (не унаследованные)
+            # Формируем имена столбцов на основе selected_askupo_cols и selected_eatool_cols
+            source1_compare_cols = [f'{AppConstants.COL_SOURCE1_PREFIX} {col}' for col in self.selected_askupo_cols]
+            source2_compare_cols = [f'{AppConstants.COL_SOURCE2_PREFIX} {col}' for col in self.selected_eatool_cols]
 
-            source1 = str(row[source1_col])
-            source2 = str(row[source2_col]) if row[source2_col] else ""
+            # Собираем значения ТОЛЬКО из сравниваемых столбцов
+            source1_values = [str(row[col]) for col in source1_compare_cols if col in row.index and not pd.isna(row[col]) and str(row[col]).strip()]
+            source2_values = [str(row[col]) for col in source2_compare_cols if col in row.index and not pd.isna(row[col]) and str(row[col]).strip()]
+
+            source1 = " | ".join(source1_values) if source1_values else ""
+            source2 = " | ".join(source2_values) if source2_values else ""
 
             values = (
                 idx + 1,
-                source1[:50] + "..." if len(source1) > 50 else source1,
-                source2[:50] + "..." if source2 and len(source2) > 50 else source2 if source2 else "❌ НЕТ",
+                source1[:80] + "..." if len(source1) > 80 else source1,
+                source2[:80] + "..." if source2 and len(source2) > 80 else source2 if source2 else "❌ НЕТ",
                 f"{row['Процент совпадения']}%"
             )
 

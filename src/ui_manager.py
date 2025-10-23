@@ -536,6 +536,9 @@ class UIManager:
         selected_indices = self.parent.askupo_col_listbox.curselection()
         self.parent.selected_askupo_cols = [self.parent.askupo_columns[i] for i in selected_indices]
 
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Синхронизируем с data_manager!
+        self.parent.data_manager.selected_source1_cols = self.parent.selected_askupo_cols
+
         # Ограничение: максимум 2 столбца
         if len(selected_indices) > 2:
             messagebox.showwarning("Предупреждение",
@@ -544,11 +547,22 @@ class UIManager:
             # Отменяем последний выбор
             self.parent.askupo_col_listbox.selection_clear(selected_indices[-1])
             self.parent.selected_askupo_cols = self.parent.selected_askupo_cols[:-1]
+            # Синхронизируем изменение с data_manager
+            self.parent.data_manager.selected_source1_cols = self.parent.selected_askupo_cols
+
+        # АВТО-РЕЖИМ: Автоматически включаем галку если выбрано 2 столбца в ОБОИХ источниках
+        if len(self.parent.selected_askupo_cols) == 2 and len(self.parent.selected_eatool_cols) == 2:
+            self.parent.multi_column_mode_var.set(True)
+        elif len(self.parent.selected_askupo_cols) == 1 or len(self.parent.selected_eatool_cols) == 1:
+            self.parent.multi_column_mode_var.set(False)
 
     def on_eatool_column_select(self, event):
         """Обработчик выбора столбцов из источника 2"""
         selected_indices = self.parent.eatool_col_listbox.curselection()
         self.parent.selected_eatool_cols = [self.parent.eatool_columns[i] for i in selected_indices]
+
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Синхронизируем с data_manager!
+        self.parent.data_manager.selected_source2_cols = self.parent.selected_eatool_cols
 
         # Ограничение: максимум 2 столбца
         if len(selected_indices) > 2:
@@ -558,6 +572,14 @@ class UIManager:
             # Отменяем последний выбор
             self.parent.eatool_col_listbox.selection_clear(selected_indices[-1])
             self.parent.selected_eatool_cols = self.parent.selected_eatool_cols[:-1]
+            # Синхронизируем изменение с data_manager
+            self.parent.data_manager.selected_source2_cols = self.parent.selected_eatool_cols
+
+        # АВТО-РЕЖИМ: Автоматически включаем галку если выбрано 2 столбца в ОБОИХ источниках
+        if len(self.parent.selected_askupo_cols) == 2 and len(self.parent.selected_eatool_cols) == 2:
+            self.parent.multi_column_mode_var.set(True)
+        elif len(self.parent.selected_askupo_cols) == 1 or len(self.parent.selected_eatool_cols) == 1:
+            self.parent.multi_column_mode_var.set(False)
 
     def select_all_methods(self):
         """Выбрать все методы в списке"""
