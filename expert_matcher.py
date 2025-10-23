@@ -216,24 +216,26 @@ class ExpertMatcher:
                              jellyfish.jaro_similarity, "jellyfish"),
             ])
 
-        # Всегда добавляем метод точного совпадения (ВПР)
+        # Всегда добавляем метод точного совпадения (ВПР) с оптимизацией O(1)
         methods.append(
             MatchingMethod("Exact Match (ВПР)",
                          self.exact_match_func, "builtin",
-                         use_process=False, scorer=None)
+                         use_process=False, scorer=None, is_exact_match=True)
         )
 
         return methods
     
     def exact_match_func(self, s1: str, s2: str) -> float:
-        """Функция точного совпадения для метода ВПР
+        """Функция точного совпадения для метода ВПР (legacy)
 
-        Возвращает 100.0 для точного совпадения (после нормализации),
-        0.0 для несовпадения
+        ПРИМЕЧАНИЕ: Эта функция больше НЕ используется при is_exact_match=True!
+        Оптимизированный поиск происходит напрямую через словарь в find_best_match.
+        Функция оставлена для совместимости с интерфейсом MatchingMethod.
+
+        Возвращает 100.0 для точного совпадения, 0.0 для несовпадения
         """
-        norm_s1 = self.engine.normalize_string(s1)
-        norm_s2 = self.engine.normalize_string(s2)
-        return 100.0 if norm_s1 == norm_s2 else 0.0
+        # Строки УЖЕ нормализованы перед вызовом - просто сравниваем
+        return 100.0 if s1 == s2 else 0.0
 
     # Алиасы для обратной совместимости (делегируют в engine)
     def normalize_string(self, s: str) -> str:
@@ -312,6 +314,11 @@ class ExpertMatcher:
             # Нет совпадения - пустые значения
             for col in eatool_cols:
                 result_row[f'{AppConstants.COL_SOURCE2_PREFIX} {col}'] = ""
+
+        # НОВОЕ: Добавляем НОРМАЛИЗОВАННЫЕ значения для отладки (справочные столбцы)
+        # Показывают что РЕАЛЬНО сравнивается после всех преобразований
+        result_row['[DEBUG] Нормализованный Источник 1'] = self.engine.normalize_string(askupo_combined)
+        result_row['[DEBUG] Нормализованный Источник 2'] = self.engine.normalize_string(best_match) if best_match else ""
 
         # Добавляем процент и метод в конец
         result_row[AppConstants.COL_PERCENT] = round(best_score, 1)
@@ -943,24 +950,21 @@ class ExpertMatcher:
         eatool_cols = self.selected_eatool_cols if self.selected_eatool_cols else [eatool_col if eatool_col else eatool_df.columns[0]]
 
         # Подготовка данных из источника 2 для сравнения
+        # ОПТИМИЗАЦИЯ: один проход вместо двух (было 2 цикла - теперь 1)
         eatool_combined_names = []
         eatool_original_values = []
+        eatool_row_dict = {}
 
         for _, row in eatool_df.iterrows():
             # Объединяем значения из выбранных столбцов
             combined = self.engine.combine_columns(row, eatool_cols)
             eatool_combined_names.append(combined)
             eatool_original_values.append(combined)
+            eatool_row_dict[combined] = row  # Заполняем словарь сразу в том же цикле
 
         # Нормализация для поиска
-        eatool_normalized = [self.normalize_string(name) for name in eatool_combined_names]
+        eatool_normalized = [self.engine.normalize_string(name) for name in eatool_combined_names]
         choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_original_values)}
-
-        # Создаём словарь для быстрого поиска строки по комбинированному значению
-        eatool_row_dict = {}
-        for idx, row in eatool_df.iterrows():
-            combined = self.engine.combine_columns(row, eatool_cols)
-            eatool_row_dict[combined] = row
 
         results = []
 
@@ -1033,19 +1037,17 @@ class ExpertMatcher:
         start_time = time.time()
 
         # Подготовка данных источника 2 с объединением столбцов
+        # ОПТИМИЗАЦИЯ: один проход вместо двух (было 2 цикла - теперь 1)
         eatool_combined_names = []
+        eatool_row_dict = {}
+
         for _, row in eatool_df.iterrows():
             combined = self.engine.combine_columns(row, eatool_cols)
             eatool_combined_names.append(combined)
+            eatool_row_dict[combined] = row  # Заполняем словарь сразу в том же цикле
 
         eatool_normalized = [self.engine.normalize_string(name) for name in eatool_combined_names]
         choice_dict = {norm: orig for norm, orig in zip(eatool_normalized, eatool_combined_names)}
-
-        # Создаём словарь для быстрого поиска строки по комбинированному значению
-        eatool_row_dict = {}
-        for idx, row in eatool_df.iterrows():
-            combined = self.engine.combine_columns(row, eatool_cols)
-            eatool_row_dict[combined] = row
 
         status_label.config(text="Обработка записей...")
 

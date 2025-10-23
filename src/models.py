@@ -27,7 +27,8 @@ class MatchingMethod:
     """Класс для описания метода сопоставления"""
 
     def __init__(self, name: str, func: Callable, library: str,
-                 use_process: bool = False, scorer=None, use_original_strings: bool = False):
+                 use_process: bool = False, scorer=None, use_original_strings: bool = False,
+                 is_exact_match: bool = False):
         """
         Инициализация метода сопоставления
 
@@ -38,6 +39,7 @@ class MatchingMethod:
             use_process: Использовать ли rapidfuzz.process.extractOne (оптимизация)
             scorer: Scorer для rapidfuzz (если use_process=True)
             use_original_strings: Legacy параметр (не используется)
+            is_exact_match: Флаг точного совпадения для оптимизации ВПР (O(1) вместо O(N))
         """
         self.name = name
         self.func = func
@@ -45,6 +47,7 @@ class MatchingMethod:
         self.use_process = use_process
         self.scorer = scorer
         self.use_original_strings = use_original_strings  # Не используется (Legacy)
+        self.is_exact_match = is_exact_match
 
     def find_best_match(self, query: str, choices: List[str],
                        choice_dict: Dict[str, str]) -> Tuple[str, float]:
@@ -63,6 +66,14 @@ class MatchingMethod:
             return "", 0.0
 
         try:
+            # ОПТИМИЗАЦИЯ для Exact Match (ВПР): O(1) поиск вместо O(N) перебора
+            if self.is_exact_match:
+                # Прямой поиск в словаре - мгновенно даже для миллионов записей!
+                if query in choice_dict:
+                    return choice_dict[query], 100.0
+                else:
+                    return "", 0.0
+
             query_len = len(query)
 
             if self.use_process and RAPIDFUZZ_AVAILABLE and not self.use_original_strings:

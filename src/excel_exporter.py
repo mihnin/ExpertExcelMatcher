@@ -50,7 +50,8 @@ class ExcelExporter:
             70: workbook.add_format({'bg_color': '#FEF3C7', 'border': 1}),   # Желтый
             50: workbook.add_format({'bg_color': '#FED7AA', 'border': 1}),   # Оранжевый
             1: workbook.add_format({'bg_color': '#FFE4E1', 'border': 1}),    # Розовый
-            0: workbook.add_format({'bg_color': '#FEE2E2', 'border': 1})     # Красный
+            0: workbook.add_format({'bg_color': '#FEE2E2', 'border': 1}),    # Красный
+            'debug': workbook.add_format({'bg_color': '#FEF3C7', 'border': 1, 'italic': True})  # Желтый для DEBUG столбцов
         }
 
     def _apply_header_format(self, worksheet, columns, header_format):
@@ -87,8 +88,16 @@ class ExcelExporter:
             fmt = self._get_format_by_percent(percent, formats)
 
             for col_num in range(len(df.columns)):
+                col_name = df.columns[col_num]
+
+                # Специальное форматирование для DEBUG столбцов (желтый + курсив)
+                if '[DEBUG]' in str(col_name):
+                    cell_fmt = formats['debug']
+                else:
+                    cell_fmt = fmt
+
                 worksheet.write(row_num, col_num,
-                              df.iloc[row_num - 1, col_num], fmt)
+                              df.iloc[row_num - 1, col_num], cell_fmt)
 
     def _set_column_widths(self, worksheet, columns: List[str]):
         """
